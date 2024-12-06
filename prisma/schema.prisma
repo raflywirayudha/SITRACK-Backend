@@ -1,0 +1,174 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  mahasiswa
+  dosen
+  kaprodi
+  koordinator_kp
+  pembimbing_instansi
+}
+
+enum DokumenStatus {
+  submitted
+  verified
+  rejected
+}
+
+enum NotifikasiStatus {
+  read
+  unread
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  nama      String
+  password  String
+  role      Role
+  photoPath String?
+  createdAt DateTime @default(now())
+
+  mahasiswa          Mahasiswa?
+  dosen              Dosen?
+  pembimbingInstansi PembimbingInstansi?
+}
+
+model Mahasiswa {
+  id       String  @id @default(uuid())
+  nim      String  @unique
+  noHp     String? @unique
+  semester Int?
+  userId   String  @unique
+  user     User    @relation(fields: [userId], references: [id])
+
+  mahasiswaKp MahasiswaKp?
+  dokumen     Dokumen[]
+  nilai       Nilai?
+}
+
+model Dosen {
+  id     String @id @default(uuid())
+  nip    String @unique
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  isPembimbing  Boolean @default(false)
+  isPenguji     Boolean @default(false)
+  isKaprodi     Boolean @default(false)
+  isKoordinator Boolean @default(false)
+
+  mahasiswaBimbingan     MahasiswaKp[] @relation("DosenPembimbing")
+  nilaiSebagaiPembimbing Nilai[]       @relation("NilaiPembimbing")
+  nilaiSebagaiPenguji    Nilai[]       @relation("NilaiPenguji")
+  dokumenKoordinator     Dokumen[]     @relation("KoordinatorDokumen")
+  nilaiDifinalisasi      Nilai[]       @relation("FinalisasiNilai")
+}
+
+model PembimbingInstansi {
+  id       String  @id @default(uuid())
+  instansi String
+  jabatan  String?
+  noTelpon String? @unique
+  userId   String  @unique
+  user     User    @relation(fields: [userId], references: [id])
+
+  mahasiswaBimbingan MahasiswaKp[]
+  nilaiMahasiswa     Nilai[]
+}
+
+model MahasiswaKp {
+  id                   String    @id @default(uuid())
+  nim                  String?   @unique
+  pembimbingInstansiId String?
+  dosenPembimbingId    String?
+  mulaiKp              DateTime?
+  selesaiKp            DateTime?
+
+  mahasiswa          Mahasiswa?          @relation(fields: [nim], references: [nim])
+  pembimbingInstansi PembimbingInstansi? @relation(fields: [pembimbingInstansiId], references: [id])
+  dosenPembimbing    Dosen?              @relation("DosenPembimbing", fields: [dosenPembimbingId], references: [id])
+}
+
+model Dokumen {
+  id             String @id @default(uuid())
+  nim            String
+  koordinatorId  String
+  persyaratanId  String
+  pendaftaranId  String
+  pascaSeminarId String
+
+  mahasiswa    Mahasiswa    @relation(fields: [nim], references: [nim])
+  koordinator  Dosen        @relation("KoordinatorDokumen", fields: [koordinatorId], references: [id])
+  persyaratan  Persyaratan  @relation(fields: [persyaratanId], references: [id])
+  pendaftaran  Pendaftaran  @relation(fields: [pendaftaranId], references: [id])
+  pascaSeminar PascaSeminar @relation(fields: [pascaSeminarId], references: [id])
+
+  @@index([nim])
+}
+
+model Persyaratan {
+  id            String        @id @default(uuid())
+  nama          String
+  filePath      String
+  tanggalUpload DateTime
+  status        DokumenStatus
+  komentar      String?
+
+  dokumen Dokumen[]
+}
+
+model Pendaftaran {
+  id            String        @id @default(uuid())
+  judul         String
+  nama          String
+  filePath      String
+  tanggalUpload DateTime
+  status        DokumenStatus
+  komentar      String?
+
+  dokumen Dokumen[]
+}
+
+model PascaSeminar {
+  id            String        @id @default(uuid())
+  nama          String
+  filePath      String
+  tanggalUpload DateTime
+  status        DokumenStatus
+  komentar      String?
+
+  dokumen Dokumen[]
+}
+
+model Nilai {
+  id                      String    @id @default(uuid())
+  nim                     String?   @unique
+  judul                   String?
+  jadwal                  DateTime?
+  ruangan                 String?
+  nilaiPembimbing         Float?
+  nilaiPenguji            Float?
+  nilaiPembimbingInstansi Float?
+  dosenPembimbingId       String?
+  dosenPengujiId          String?
+  pembimbingInstansiId    String?
+  nilaiAkhir              Float?
+  isFinalized             Boolean   @default(false)
+  finalizedBy             String?
+  finalizedAt             DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime? @updatedAt
+
+  mahasiswa          Mahasiswa?          @relation(fields: [nim], references: [nim])
+  dosenPembimbing    Dosen?              @relation("NilaiPembimbing", fields: [dosenPembimbingId], references: [id])
+  dosenPenguji       Dosen?              @relation("NilaiPenguji", fields: [dosenPengujiId], references: [id])
+  pembimbingInstansi PembimbingInstansi? @relation(fields: [pembimbingInstansiId], references: [id])
+  finalisasiOleh     Dosen?              @relation("FinalisasiNilai", fields: [finalizedBy], references: [id])
+}
