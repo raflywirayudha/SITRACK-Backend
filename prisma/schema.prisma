@@ -9,7 +9,8 @@ generator client {
 
 enum Role {
   mahasiswa
-  dosen
+  dosen_pembimbing
+  dosen_penguji
   kaprodi
   koordinator_kp
   pembimbing_instansi
@@ -21,9 +22,26 @@ enum DokumenStatus {
   rejected
 }
 
-enum NotifikasiStatus {
-  read
-  unread
+enum KategoriDokumen {
+  PERSYARATAN
+  PENDAFTARAN
+  PASCA_SEMINAR
+}
+
+enum JenisDokumen {
+  SURAT_KETERANGAN_SELESAI_KP
+  LEMBAR_PERNYATAAN_SELESAI_KP
+  DAILY_REPORT
+  LAPORAN_TAMBAHAN_KP
+  SURAT_BIMBINGAN_DOSEN
+  SETORAN_HAFALAN
+  FORM_KEHADIRAN_SEMINAR
+  LEMBAR_FORM_BIMBINGAN
+  PENGAJUAN_PENDAFTARAN_DISEMINASI
+  SURAT_UNDANGAN_SEMINAR_HASIL
+  BERITA_ACARA_SEMINAR
+  DAFTAR_HADIR_SEMINAR
+  LEMBAR_PENGESAHAN_KP
 }
 
 model User {
@@ -38,6 +56,7 @@ model User {
   mahasiswa          Mahasiswa?
   dosen              Dosen?
   pembimbingInstansi PembimbingInstansi?
+  Dokumen            Dokumen[]
 }
 
 model Mahasiswa {
@@ -91,66 +110,44 @@ model MahasiswaKp {
   mulaiKp              DateTime?
   selesaiKp            DateTime?
 
+  // Tambahan field baru untuk pendaftaran
+  judulLaporan   String?
+  namaInstansi   String?
+  alamatInstansi String?
+
+  // Detail Pembimbing Instansi
+  namaPembimbingInstansi    String?
+  jabatanPembimbingInstansi String?
+  noTeleponPembimbing       String?
+  emailPembimbingInstansi   String?
+
   mahasiswa          Mahasiswa?          @relation(fields: [nim], references: [nim])
   pembimbingInstansi PembimbingInstansi? @relation(fields: [pembimbingInstansiId], references: [id])
   dosenPembimbing    Dosen?              @relation("DosenPembimbing", fields: [dosenPembimbingId], references: [id])
 }
 
 model Dokumen {
-  id             String @id @default(uuid())
-  nim            String
-  koordinatorId  String
-  persyaratanId  String
-  pendaftaranId  String
-  pascaSeminarId String
+  id            String          @id @default(uuid())
+  nim           String
+  userId        String
+  koordinatorId String
+  jenisDokumen  JenisDokumen
+  kategori      KategoriDokumen
+  filePath      String
+  tanggalUpload DateTime        @default(now())
+  status        DokumenStatus   @default(submitted)
+  komentar      String?
 
-  mahasiswa    Mahasiswa    @relation(fields: [nim], references: [nim])
-  koordinator  Dosen        @relation("KoordinatorDokumen", fields: [koordinatorId], references: [id])
-  persyaratan  Persyaratan  @relation(fields: [persyaratanId], references: [id])
-  pendaftaran  Pendaftaran  @relation(fields: [pendaftaranId], references: [id])
-  pascaSeminar PascaSeminar @relation(fields: [pascaSeminarId], references: [id])
+  mahasiswa   Mahasiswa @relation(fields: [nim], references: [nim])
+  koordinator Dosen     @relation("KoordinatorDokumen", fields: [koordinatorId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
 
   @@index([nim])
-}
-
-model Persyaratan {
-  id            String        @id @default(uuid())
-  nama          String
-  filePath      String
-  tanggalUpload DateTime
-  status        DokumenStatus
-  komentar      String?
-
-  dokumen Dokumen[]
-}
-
-model Pendaftaran {
-  id            String        @id @default(uuid())
-  judul         String
-  nama          String
-  filePath      String
-  tanggalUpload DateTime
-  status        DokumenStatus
-  komentar      String?
-
-  dokumen Dokumen[]
-}
-
-model PascaSeminar {
-  id            String        @id @default(uuid())
-  nama          String
-  filePath      String
-  tanggalUpload DateTime
-  status        DokumenStatus
-  komentar      String?
-
-  dokumen Dokumen[]
 }
 
 model Nilai {
   id                      String    @id @default(uuid())
   nim                     String?   @unique
-  judul                   String?
   jadwal                  DateTime?
   ruangan                 String?
   nilaiPembimbing         Float?

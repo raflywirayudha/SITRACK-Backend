@@ -1,95 +1,60 @@
-import {PrismaClient} from "@prisma/client";
-import {Request, Response} from "express";
+import {Request, Response } from "express";
+import mahasiswaServices from "../services/mahasiswa.services";
+import { DokumenPayload } from '../types/document.types';
 
-const prisma = new PrismaClient();
+export class MahasiswaController {
+    async uploadDokumen(req: Request, res: Response) {
+        try {
+            // Type assertion untuk req.user
+            const { nim } = (req.user as { nim: string });
+            const userId = (req.user as { id: string }).id;
+            const file = req.file;
 
-const postDocument = async (
-    req: Request,
-    res: Response,
-    modelName: 'Persyaratan' | 'Pendaftaran' | 'PascaSeminar'
-) => {
-    try {
-        const {nim, koordinatorId} = req.body
-        const file = req.file
+            if (!file) {
+                return res.status(400).json({ message: 'File tidak ditemukan' });
+            }
 
-        if (!file) {
-            return res.status(400).json({error: 'No file uploaded'})
+            const payload: DokumenPayload = {
+                jenisDokumen: req.body.jenisDokumen,
+                kategori: req.body.kategori,
+                filePath: file.path
+            };
+
+            const dokumen = await mahasiswaServices.uploadDokumen(
+                nim,
+                userId,
+                payload
+            );
+
+            res.status(201).json(dokumen);
+        } catch (error: unknown) {
+            // Type guard untuk error
+            if (error instanceof Error) {
+                res.status(400).json({
+                    message: error.message
+                });
+            } else {
+                res.status(400).json({
+                    message: 'An unknown error occurred'
+                });
+            }
         }
+    }
 
-        const documentData = {
-            nama: file.originalname,
-            filePath: file.path,
-            tanggalUpload: new Date(),
-            status: 'submitted',
-            komentar: null
+    async getDokumenMahasiswa(req: Request, res: Response) {
+        try {
+            const { nim } = (req.user as { nim: string });
+            const dokumen = await mahasiswaServices.getDokumenByMahasiswa(nim);
+            res.json(dokumen);
+        } catch (error: unknown) {
+            // Type guard untuk error
+            if (error instanceof Error) {
+                res.status(500).json({ message: error.message });
+            } else {
+                res.status(500).json({ message: 'An unknown error occurred' });
+            }
         }
-
-        const createdDocument = await (prisma[modelName.toLowerCase() as keyof typeof prisma] as any).create({
-            data: documentData
-        })
-
-        await prisma.dokumen.create({
-            data: {
-                nim: nim,
-                koordinatorId: koordinatorId,
-                [`${modelName.toLowerCase()}Id`]: createdDocument.id,
-                persyaratanId: modelName === 'Persyaratan' ? createdDocument.id : undefined,
-                pendaftaranId: modelName === 'Pendaftaran' ? createdDocument.id : undefined,
-                pascaSeminarId: modelName === 'PascaSeminar' ? createdDocument.id : undefined,
-            }
-        })
-
-        res.status(201).json(createdDocument)
-    } catch (error) {
-        console.error(error)
-        res.status(500).json({error: 'Document upload failed'})
     }
 }
 
-const getDocuments = async (
-    req: Request,
-    res: Response,
-    modelName: 'Persyaratan' | 'Pendaftaran' | 'PascaSeminar'
-) => {
-    try {
-        const {nim, status} = req.query
-        const documents = await (prisma[modelName.toLowerCase() as keyof typeof prisma] as any).findMany({
-            where: {
-                ...(nim ? {dokumen: {some: {nim: String(nim)}}} : {}),
-                ...(status ? {status: status as any} : {})
-            }
-        })
-        res.json(documents)
-    } catch (error) {
-        res.status(500).json({error: 'Failed to retrieve documents'})
-    }
-}
-
-const updateDocument = async (
-    req: Request,
-    res: Response,
-    modelName: 'Persyaratan' | 'Pendaftaran' | 'PascaSeminar'
-) => {
-    try {
-        const {id} = req.params
-        const {status, komentar} = req.body
-
-        const updatedDocument = await (prisma[modelName.toLowerCase() as keyof typeof prisma] as any).update({
-            where: {id},
-            data: {
-                ...(status && {status}),
-                ...(komentar && {komentar})
-            }
-        })
-
-        res.json(updatedDocument)
-    } catch (error) {
-        res.status(500).json({error: 'Failed to update document'})
-    }
-}
-
-export {
-    postDocument,
-    getDocuments,
-    updateDocument
-};
+export default new MahasiswaController();

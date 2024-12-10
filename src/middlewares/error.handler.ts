@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 
-export const errorHandler = (
+export const errorUploadHandler = (
     err: any,
     req: express.Request,
     res: express.Response,

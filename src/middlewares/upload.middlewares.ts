@@ -1,29 +1,27 @@
-import multer from 'multer'
-import path from 'path'
-import fs from 'fs'
+import multer from 'multer';
+import path from 'path';
 
-const createStorage = (subFolder: string) => multer.diskStorage({
+const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const uploadPath = path.join(__dirname, '../../uploads', subFolder)
-        fs.mkdirSync(uploadPath, { recursive: true })
-        cb(null, uploadPath)
+        cb(null, 'uploads/dokumen');
     },
     filename: (req, file, cb) => {
-        cb(null, `${Date.now()}-${file.originalname}`)
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
     }
-})
+});
 
-export const uploadPersyaratan = multer({
-    storage: createStorage('persyaratan'),
-    limits: { fileSize: 5 * 1024 * 1024 }
-})
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Tipe file tidak diizinkan'));
+        }
+    }
+});
 
-export const uploadPendaftaran = multer({
-    storage: createStorage('pendaftaran'),
-    limits: { fileSize: 5 * 1024 * 1024 }
-})
-
-export const uploadPascaSeminar = multer({
-    storage: createStorage('pasca-seminar'),
-    limits: { fileSize: 5 * 1024 * 1024 }
-})
+export default upload;
