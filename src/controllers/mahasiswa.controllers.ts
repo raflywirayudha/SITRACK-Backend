@@ -1,60 +1,131 @@
-import {Request, Response } from "express";
+import { Request, Response } from "express";
 import mahasiswaServices from "../services/mahasiswa.services";
-import { DokumenPayload } from '../types/document.types';
+import upload from "../middlewares/upload.middlewares";
 
-export class MahasiswaController {
-    async uploadDokumen(req: Request, res: Response) {
+export class TahapanController {
+    // Middleware untuk handle multiple file upload
+    private uploadMultipleDokumen = upload.array('dokumen');
+
+    // Handler untuk upload persyaratan
+    async uploadPersyaratan(req: Request, res: Response) {
         try {
-            // Type assertion untuk req.user
             const { nim } = (req.user as { nim: string });
             const userId = (req.user as { id: string }).id;
-            const file = req.file;
 
-            if (!file) {
-                return res.status(400).json({ message: 'File tidak ditemukan' });
-            }
+            this.uploadMultipleDokumen(req, res, async (err) => {
+                if (err) {
+                    return res.status(400).json({ message: err.message });
+                }
 
-            const payload: DokumenPayload = {
-                jenisDokumen: req.body.jenisDokumen,
-                kategori: req.body.kategori,
-                filePath: file.path
-            };
+                const files = req.files as Express.Multer.File[];
 
-            const dokumen = await mahasiswaServices.uploadDokumen(
-                nim,
-                userId,
-                payload
-            );
+                const payload = {
+                    dokumen: files.map(file => ({
+                        jenisDokumen: file.originalname, // Atau cara lain menentukan jenis dokumen
+                        filePath: file.path
+                    }))
+                };
 
-            res.status(201).json(dokumen);
+                const result = await mahasiswaServices.uploadPersyaratan(
+                    nim,
+                    userId,
+                    payload
+                );
+
+                res.status(201).json(result);
+            });
         } catch (error: unknown) {
-            // Type guard untuk error
-            if (error instanceof Error) {
-                res.status(400).json({
-                    message: error.message
-                });
-            } else {
-                res.status(400).json({
-                    message: 'An unknown error occurred'
-                });
-            }
+            this.handleError(error, res);
         }
     }
 
-    async getDokumenMahasiswa(req: Request, res: Response) {
+    // Handler untuk pendaftaran KP
+    async daftarKp(req: Request, res: Response) {
         try {
             const { nim } = (req.user as { nim: string });
-            const dokumen = await mahasiswaServices.getDokumenByMahasiswa(nim);
-            res.json(dokumen);
+            const userId = (req.user as { id: string }).id;
+
+            this.uploadMultipleDokumen(req, res, async (err) => {
+                if (err) {
+                    return res.status(400).json({ message: err.message });
+                }
+
+                const files = req.files as Express.Multer.File[];
+                const { formData } = req.body;
+
+                // Parse form data (jika dikirim sebagai JSON string)
+                const parsedFormData = JSON.parse(formData);
+
+                const payload = {
+                    dokumen: files.map(file => ({
+                        jenisDokumen: file.originalname,
+                        filePath: file.path
+                    })),
+                    formData: {
+                        ...parsedFormData,
+                        mulaiKp: new Date(parsedFormData.mulaiKp),
+                        selesaiKp: new Date(parsedFormData.selesaiKp)
+                    }
+                };
+
+                const result = await mahasiswaServices.daftarKp(
+                    nim,
+                    userId,
+                    payload
+                );
+
+                res.status(201).json(result);
+            });
         } catch (error: unknown) {
-            // Type guard untuk error
-            if (error instanceof Error) {
-                res.status(500).json({ message: error.message });
-            } else {
-                res.status(500).json({ message: 'An unknown error occurred' });
-            }
+            this.handleError(error, res);
+        }
+    }
+
+    // Handler untuk upload pasca seminar
+    async uploadPascaSeminar(req: Request, res: Response) {
+        try {
+            const { nim } = (req.user as { nim: string });
+            const userId = (req.user as { id: string }).id;
+
+            this.uploadMultipleDokumen(req, res, async (err) => {
+                if (err) {
+                    return res.status(400).json({ message: err.message });
+                }
+
+                const files = req.files as Express.Multer.File[];
+
+                const payload = {
+                    dokumen: files.map(file => ({
+                        jenisDokumen: file.originalname,
+                        filePath: file.path
+                    }))
+                };
+
+                const result = await mahasiswaServices.uploadPascaSeminar(
+                    nim,
+                    userId,
+                    payload
+                );
+
+                res.status(201).json(result);
+            });
+        } catch (error: unknown) {
+            this.handleError(error, res);
+        }
+    }
+
+    // Error handling umum
+    private handleError(error: unknown, res: Response) {
+        if (error instanceof Error) {
+            res.status(400).json({
+                message: error.message
+            });
+        } else {
+            res.status(400).json({
+                message: 'An unknown error occurred'
+            });
         }
     }
 }
 
-export default new MahasiswaController();
+export default new TahapanController();
