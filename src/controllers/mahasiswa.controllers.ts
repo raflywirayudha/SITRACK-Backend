@@ -1,131 +1,171 @@
-import { Request, Response } from "express";
-import mahasiswaServices from "../services/mahasiswa.services";
-import upload from "../middlewares/upload.middlewares";
+import { PrismaClient } from '@prisma/client'
+import { Request, Response } from 'express'
 
-export class TahapanController {
-    // Middleware untuk handle multiple file upload
-    private uploadMultipleDokumen = upload.array('dokumen');
+const prisma = new PrismaClient()
 
-    // Handler untuk upload persyaratan
-    async uploadPersyaratan(req: Request, res: Response) {
+export class MahasiswaController {
+    // Enum untuk tahapan dokumen
+    private static TAHAPAN_DOKUMEN = {
+        PERSYARATAN: [
+            'SURAT_KETERANGAN_SELESAI_KP',
+            'LEMBAR_PERNYATAAN_SELESAI_KP',
+            'DAILY_REPORT',
+            'LAPORAN_TAMBAHAN_KP',
+            'SURAT_BIMBINGAN_DOSEN',
+            'SETORAN_HAFALAN',
+            'FORM_KEHADIRAN_SEMINAR'
+        ],
+        PENDAFTARAN: [
+            'LEMBAR_PERNYATAAN_SELESAI_KP',
+            'SURAT_BIMBINGAN_DOSEN',
+            'SETORAN_HAFALAN',
+            'PENGAJUAN_PENDAFTARAN_DISEMINASI'
+        ],
+        PASCA_SEMINAR: [
+            'SURAT_UNDANGAN_SEMINAR_HASIL',
+            'BERITA_ACARA_SEMINAR',
+            'DAFTAR_HADIR_SEMINAR',
+            'LEMBAR_PENGESAHAN_KP'
+        ]
+    }
+
+    // Upload Dokumen
+    async uploadDokumen(req: Request, res: Response) {
         try {
-            const { nim } = (req.user as { nim: string });
-            const userId = (req.user as { id: string }).id;
+            const { userId, nim, jenisDokumen, kategori } = req.body
+            const file = req.file
 
-            this.uploadMultipleDokumen(req, res, async (err) => {
-                if (err) {
-                    return res.status(400).json({ message: err.message });
-                }
+            // Validasi jenis dokumen sesuai tahapan
+            if (!this.validateDokumen(jenisDokumen, kategori)) {
+                return res.status(400).json({ message: 'Dokumen tidak sesuai dengan tahapan' })
+            }
 
-                const files = req.files as Express.Multer.File[];
+            // Cari koordinator KP
+            const koordinator = await prisma.dosen.findFirst({
+                where: { isKoordinator: true }
+            })
 
-                const payload = {
-                    dokumen: files.map(file => ({
-                        jenisDokumen: file.originalname, // Atau cara lain menentukan jenis dokumen
-                        filePath: file.path
-                    }))
-                };
+            if (!koordinator) {
+                return res.status(404).json({ message: 'Koordinator KP tidak ditemukan' })
+            }
 
-                const result = await mahasiswaServices.uploadPersyaratan(
+            const dokumen = await prisma.dokumen.create({
+                data: {
                     nim,
                     userId,
-                    payload
-                );
+                    koordinatorId: koordinator.id,
+                    jenisDokumen,
+                    kategori,
+                    filePath: file?.path || '', // Sesuaikan dengan logic upload file Anda
+                    status: 'submitted'
+                }
+            })
 
-                res.status(201).json(result);
-            });
-        } catch (error: unknown) {
-            this.handleError(error, res);
+            res.status(201).json(dokumen)
+        } catch (error) {
+            console.error('Error upload dokumen:', error)
+            res.status(500).json({ message: 'Gagal upload dokumen' })
         }
     }
 
-    // Handler untuk pendaftaran KP
-    async daftarKp(req: Request, res: Response) {
+    // Update Dokumen
+    async updateDokumen(req: Request, res: Response) {
         try {
-            const { nim } = (req.user as { nim: string });
-            const userId = (req.user as { id: string }).id;
+            const { dokumentId } = req.params
+            const { jenisDokumen, kategori } = req.body
+            const file = req.file
 
-            this.uploadMultipleDokumen(req, res, async (err) => {
-                if (err) {
-                    return res.status(400).json({ message: err.message });
+            // Validasi jenis dokumen sesuai tahapan
+            if (!this.validateDokumen(jenisDokumen, kategori)) {
+                return res.status(400).json({ message: 'Dokumen tidak sesuai dengan tahapan' })
+            }
+
+            const dokumen = await prisma.dokumen.update({
+                where: { id: dokumentId },
+                data: {
+                    jenisDokumen,
+                    kategori,
+                    filePath: file?.path || '',
+                    tanggalUpload: new Date(),
+                    status: 'submitted'
                 }
+            })
 
-                const files = req.files as Express.Multer.File[];
-                const { formData } = req.body;
-
-                // Parse form data (jika dikirim sebagai JSON string)
-                const parsedFormData = JSON.parse(formData);
-
-                const payload = {
-                    dokumen: files.map(file => ({
-                        jenisDokumen: file.originalname,
-                        filePath: file.path
-                    })),
-                    formData: {
-                        ...parsedFormData,
-                        mulaiKp: new Date(parsedFormData.mulaiKp),
-                        selesaiKp: new Date(parsedFormData.selesaiKp)
-                    }
-                };
-
-                const result = await mahasiswaServices.daftarKp(
-                    nim,
-                    userId,
-                    payload
-                );
-
-                res.status(201).json(result);
-            });
-        } catch (error: unknown) {
-            this.handleError(error, res);
+            res.status(200).json(dokumen)
+        } catch (error) {
+            console.error('Error update dokumen:', error)
+            res.status(500).json({ message: 'Gagal update dokumen' })
         }
     }
 
-    // Handler untuk upload pasca seminar
-    async uploadPascaSeminar(req: Request, res: Response) {
+    // Pendaftaran KP
+    async daftarKP(req: Request, res: Response) {
         try {
-            const { nim } = (req.user as { nim: string });
-            const userId = (req.user as { id: string }).id;
+            const {
+                nim,
+                judulLaporan,
+                namaInstansi,
+                alamatInstansi,
+                mulaiKp,
+                selesaiKp,
+                namaPembimbingInstansi,
+                noTeleponPembimbing,
+                emailPembimbingInstansi
+            } = req.body
 
-            this.uploadMultipleDokumen(req, res, async (err) => {
-                if (err) {
-                    return res.status(400).json({ message: err.message });
-                }
-
-                const files = req.files as Express.Multer.File[];
-
-                const payload = {
-                    dokumen: files.map(file => ({
-                        jenisDokumen: file.originalname,
-                        filePath: file.path
-                    }))
-                };
-
-                const result = await mahasiswaServices.uploadPascaSeminar(
+            const mahasiswaKp = await prisma.mahasiswaKp.create({
+                data: {
                     nim,
-                    userId,
-                    payload
-                );
+                    judulLaporan,
+                    namaInstansi,
+                    alamatInstansi,
+                    mulaiKp: new Date(mulaiKp),
+                    selesaiKp: new Date(selesaiKp),
+                    namaPembimbingInstansi,
+                    noTeleponPembimbing,
+                    emailPembimbingInstansi
+                }
+            })
 
-                res.status(201).json(result);
-            });
-        } catch (error: unknown) {
-            this.handleError(error, res);
+            res.status(201).json(mahasiswaKp)
+        } catch (error) {
+            console.error('Error pendaftaran KP:', error)
+            res.status(500).json({ message: 'Gagal mendaftar KP' })
         }
     }
 
-    // Error handling umum
-    private handleError(error: unknown, res: Response) {
-        if (error instanceof Error) {
-            res.status(400).json({
-                message: error.message
-            });
-        } else {
-            res.status(400).json({
-                message: 'An unknown error occurred'
-            });
+    // Tampilkan Dokumen yang Sudah Terkirim
+    async getDokumenTerkirim(req: Request, res: Response) {
+        try {
+            const { nim } = req.params
+
+            const dokumen = await prisma.dokumen.findMany({
+                where: { nim },
+                orderBy: { tanggalUpload: 'desc' }
+            })
+
+            res.status(200).json(dokumen)
+        } catch (error) {
+            console.error('Error ambil dokumen:', error)
+            res.status(500).json({ message: 'Gagal mengambil dokumen' })
+        }
+    }
+
+    // Validasi Dokumen berdasarkan Tahapan
+    private validateDokumen(jenisDokumen: string, kategori: string): boolean {
+        const tahapanDokumen = MahasiswaController.TAHAPAN_DOKUMEN
+
+        switch(kategori) {
+            case 'PERSYARATAN':
+                return tahapanDokumen.PERSYARATAN.includes(jenisDokumen)
+            case 'PENDAFTARAN':
+                return tahapanDokumen.PENDAFTARAN.includes(jenisDokumen)
+            case 'PASCA_SEMINAR':
+                return tahapanDokumen.PASCA_SEMINAR.includes(jenisDokumen)
+            default:
+                return false
         }
     }
 }
 
-export default new TahapanController();
+export default new MahasiswaController()
