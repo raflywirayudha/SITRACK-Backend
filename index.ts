@@ -3,7 +3,6 @@ import cors from "cors";
 import authRoutes from "./src/routes/auth.routes.js";
 import dosenRoutes from "./src/routes/dosen.routes.js";
 import mahasiswaRoutes from "./src/routes/mahasiswa.routes.js";
-import koordinatorRoutes from "./src/routes/koordinator.routes";
 import { errorUploadHandler } from "./src/middlewares/error.handler";
 
 const app = express();
@@ -15,7 +14,6 @@ app.use(express.json());
 app.use(authRoutes);
 app.use(dosenRoutes);
 app.use(mahasiswaRoutes);
-app.use(koordinatorRoutes);
 app.use(errorUploadHandler);
 
 app.listen(port, () => {
