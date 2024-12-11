@@ -1,55 +1,33 @@
-import { PrismaClient, Role } from "@prisma/client";
-import { Request, Response } from "express";
-import bcrypt from "bcrypt";
+import { Request, Response } from 'express';
+import { AuthService } from '../services/auth.services';
+import { LoginDTO, RegisterDTO } from '../types/auth.types';
 
-const prisma = new PrismaClient();
-
-const postAkun = async (req: Request, res: Response) => {
-  const { email, nama, password, role } = req.body;
-
-  try {
-    // Mengecek apakah email sudah terdaftar
-    const checkUser = await prisma.user.findFirst({
-      where: { email }
-    });
-
-    if (checkUser) {
-      return res.status(400).json({
-        response: false,
-        message: "Akun dengan email tersebut sudah ada!"
-      });
+export class AuthController {
+  static async register(req: Request, res: Response) {
+    try {
+      const registerData: RegisterDTO = req.body;
+      const result = await AuthService.register(registerData);
+      res.status(201).json(result);
+    } catch (error) {
+      if (error instanceof Error) {
+        res.status(400).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: 'Internal server error' });
+      }
     }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Membuat akun baru
-    const result = await prisma.user.create({
-      data: {
-        email,
-        nama,
-        password: hashedPassword,
-        role: role || Role.mahasiswa
-      }
-    });
-
-    res.status(201).json({
-      response: true,
-      message: "Akun Berhasil didaftarkan!",
-      data: {
-        id: result.id,
-        email: result.email,
-        nama: result.nama,
-        role: result.role
-      }
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      response: false,
-      message: "Oops! Ada kesalahan di server kami"
-    });
   }
-};
 
-export { postAkun };
+  static async login(req: Request, res: Response) {
+    try {
+      const loginData: LoginDTO = req.body;
+      const result = await AuthService.login(loginData);
+      res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof Error) {
+        res.status(401).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: 'Internal server error' });
+      }
+    }
+  }
+}
