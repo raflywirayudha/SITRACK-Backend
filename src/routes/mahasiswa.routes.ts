@@ -2,22 +2,30 @@ import express from "express";
 import accessTokenValidation from "../middlewares/auth.middlewares.js";
 import {authorizeRoles} from "../middlewares/protected.middlewares.js";
 import mahasiswaController from "../controllers/mahasiswa.controllers"
+import uploadMiddleware from "../middlewares/upload.middlewares";
 
 const router = express.Router();
 
 router.post(
-    "/mahasiswa/persyaratan",
-    mahasiswaController.uploadPersyaratan
+    "/mahasiswa/upload",
+    uploadMiddleware.single("dokumen"),
+    mahasiswaController.uploadDokumen
+)
+
+router.put(
+    "/mahasiswa/dokumen/:dokumenId",
+    uploadMiddleware.single("dokumen"),
+    mahasiswaController.updateDokumen
 )
 
 router.post(
     "/mahasiswa/pendaftaran",
-    mahasiswaController.daftarKp
+    mahasiswaController.daftarKP
 )
 
-router.post(
-    "/mahasiswa/pascaseminar",
-    mahasiswaController.uploadPascaSeminar
+router.get(
+    "/mahasiswa/dokumen/:nim",
+    mahasiswaController.getDokumenTerkirim
 )
 
 export default router;
