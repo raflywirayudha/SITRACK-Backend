@@ -1,27 +1,28 @@
-import multer from 'multer';
-import path from 'path';
+import multer from 'multer'
+import path from 'path'
 
+// Konfigurasi Multer untuk upload file
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, '../../uploads/dokumen');
+        cb(null, 'uploads/dokumen_kp/')
     },
     filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname))
     }
-});
+})
 
-const upload = multer({
+const uploadMiddleware = multer({
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    limits: { fileSize: 5 * 1024 * 1024 }, // Batasan 5MB
     fileFilter: (req, file, cb) => {
-        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-        if (allowedTypes.includes(file.mimetype)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Tipe file tidak diizinkan'));
+        const allowedFileTypes = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png']
+        const extname = path.extname(file.originalname).toLowerCase()
+        if (allowedFileTypes.includes(extname)) {
+            return cb(null, true)
         }
+        cb(new Error('Tipe file tidak diizinkan'))
     }
-});
+})
 
-export default upload;
+export default uploadMiddleware
