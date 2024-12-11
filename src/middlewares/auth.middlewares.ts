@@ -1,46 +1,80 @@
-import { Request, Response, NextFunction } from "express";
-import jwt, { JwtPayload } from "jsonwebtoken";
+import {Request, Response, NextFunction, RequestHandler} from 'express';
+import jwt from "jsonwebtoken";
+import {Role} from '@prisma/client';
+import {JWTPayload} from '../types/auth.types';
+import * as process from "node:process";
 
-// Extend Request type to include 'role'
-interface CustomRequest extends Request {
-  roles?: string[];
+declare global {
+  namespace Express {
+    interface Request {
+      user?: JWTPayload;
+    }
+  }
 }
 
-const accessTokenValidation = (
-  req: Request,
-  res: Response,
-  next: NextFunction
+const JWT_SECRET = process.env.JWT_SECRET || 'you-secret-key';
+
+export const authenticateToken: RequestHandler = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
 ) => {
-  const { authorization } = req.headers;
-  const token = authorization && authorization.split(" ")[1];
+  try {
+    const authHeader = req.headers['authorization'];
+    console.log('Auth Header:', authHeader);
 
-  if (!token) {
-    return res.status(401).json({
-      response: false,
-      message: "Token is required",
-    });
-  }
+    const token = authHeader && authHeader.split(' ')[1];
+    console.log('Token:', token);
 
-  const publicKey =
-    "-----BEGIN PUBLIC KEY-----\n" +
-    process.env.PUBLIC_KEY +
-    "\n-----END PUBLIC KEY-----";
-
-  jwt.verify(token, publicKey, { algorithms: ["RS256"] }, (err, decoded) => {
-    if (err) {
-      console.error("Token verification failed:", err);
-      return res.status(401).json({ message: "Unauthorized" });
+    if (!token) {
+      console.log('No token provided');
+      res.status(401).json({ message: 'Authentication token required' });
+      return;
     }
 
-    // Type assertion to make sure 'decoded' is treated as JwtPayload
-    const jwtPayload = decoded as JwtPayload;
-
-    // Extract roles from the decoded token
-    const roles = jwtPayload.resource_access?.iMemoraise?.roles;
-
-    (req as CustomRequest).roles = roles;
-    next();
-  });
+    try {
+      const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
+      console.log('Token payload:', payload);
+      req.user = payload;
+      next();
+    } catch (error) {
+      console.error('JWT Verification Error:', error);
+      res.status(403).json({ message: 'Invalid token' });
+      return;
+    }
+  } catch (error) {
+    console.error('Authentication Error:', error);
+    next(error);
+  }
 };
 
-export default accessTokenValidation;
+export const authorizeRoles = (roles: Role[]): RequestHandler =>
+    (req, res, next): void => {
+      try {
+        const authHeader = req.headers['authorization'];
+        console.log('Auth Header:', authHeader);
+
+        const token = authHeader && authHeader.split(' ')[1];
+        console.log('Token:', token);
+
+        if (!token) {
+          console.log('No token provided');
+          res.status(401).json({ message: 'Authentication token required' });
+          return;
+        }
+
+        try {
+          const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
+          console.log('Token payload:', payload);
+          req.user = payload;
+          next();
+        } catch (error) {
+          console.error('JWT Verification Error:', error);
+          res.status(403).json({ message: 'Invalid token' });
+          return;
+        }
+      } catch (error) {
+        console.error('Authentication Error:', error); // Debug log
+        next(error);
+      }
+    };
