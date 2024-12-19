@@ -1,6 +1,4 @@
 import express from "express";
-import accessTokenValidation from "../middlewares/auth.middlewares.js";
-import {authorizeRoles} from "../middlewares/protected.middlewares.js";
 import mahasiswaController from "../controllers/mahasiswa.controllers"
 import uploadMiddleware from "../middlewares/upload.middlewares";
 

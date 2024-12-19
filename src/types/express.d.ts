@@ -12,3 +12,15 @@ declare global {
         }
     }
 }
+
+declare global {
+    namespace Express {
+        interface Request {
+            user?: {
+                id: string;
+                email: string;
+                role: 'mahasiswa' | 'dosen_pembimbing' | 'dosen_penguji' | 'kaprodi' | 'koordinator' | 'pembimbing_instansi';
+            }
+        }
+    }
+}

@@ -7,12 +7,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
-enum Role {
+enum RoleType {
   mahasiswa
   dosen_pembimbing
   dosen_penguji
   kaprodi
-  koordinator_kp
+  koordinator
   pembimbing_instansi
 }
 
@@ -49,7 +49,6 @@ model User {
   email     String   @unique
   nama      String
   password  String
-  role      Role
   photoPath String?
   createdAt DateTime @default(now())
 
@@ -57,6 +56,24 @@ model User {
   dosen              Dosen?
   pembimbingInstansi PembimbingInstansi?
   Dokumen            Dokumen[]
+  userRoles          UserRole[]
+}
+
+model Role {
+  id        String     @id @default(uuid())
+  name      RoleType   @unique
+  userRoles UserRole[]
+}
+
+model UserRole {
+  id     String @id @default(uuid())
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
 }
 
 model Mahasiswa {

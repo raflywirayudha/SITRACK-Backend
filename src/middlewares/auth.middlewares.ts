@@ -1,80 +1,57 @@
-import {Request, Response, NextFunction, RequestHandler} from 'express';
-import jwt from "jsonwebtoken";
-import {Role} from '@prisma/client';
-import {JWTPayload} from '../types/auth.types';
-import * as process from "node:process";
+import { Request, Response, NextFunction } from 'express'
+import jwt from 'jsonwebtoken'
+import prisma from '../utils/prisma.utils';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here'
 
 declare global {
-  namespace Express {
-    interface Request {
-      user?: JWTPayload;
+    namespace Express {
+        interface Request {
+            user?: {
+                id: string;
+                role: string;
+            };
+        }
     }
-  }
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'you-secret-key';
+export const authenticateJWT = async (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization
 
-export const authenticateToken: RequestHandler = async (
-    req: Request,
-    res: Response,
-    next: NextFunction
-) => {
-  try {
-    const authHeader = req.headers['authorization'];
-    console.log('Auth Header:', authHeader);
-
-    const token = authHeader && authHeader.split(' ')[1];
-    console.log('Token:', token);
-
-    if (!token) {
-      console.log('No token provided');
-      res.status(401).json({ message: 'Authentication token required' });
-      return;
-    }
-
-    try {
-      const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
-      console.log('Token payload:', payload);
-      req.user = payload;
-      next();
-    } catch (error) {
-      console.error('JWT Verification Error:', error);
-      res.status(403).json({ message: 'Invalid token' });
-      return;
-    }
-  } catch (error) {
-    console.error('Authentication Error:', error);
-    next(error);
-  }
-};
-
-export const authorizeRoles = (roles: Role[]): RequestHandler =>
-    (req, res, next): void => {
-      try {
-        const authHeader = req.headers['authorization'];
-        console.log('Auth Header:', authHeader);
-
-        const token = authHeader && authHeader.split(' ')[1];
-        console.log('Token:', token);
-
-        if (!token) {
-          console.log('No token provided');
-          res.status(401).json({ message: 'Authentication token required' });
-          return;
-        }
+    if (authHeader) {
+        const token = authHeader.split(' ')[1]
 
         try {
-          const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
-          console.log('Token payload:', payload);
-          req.user = payload;
-          next();
+            const decoded = jwt.verify(token, JWT_SECRET) as {
+                id: string,
+                email: string,
+                role: 'mahasiswa' | 'dosen_pembimbing' | 'dosen_penguji' | 'kaprodi' | 'koordinator' | 'pembimbing_instansi'
+            }
+
+            const user = await prisma.user.findUnique({
+                where: { id: decoded.id },
+                select: { id: true, email: true, role: true }
+            })
+
+            if (!user) {
+                return res.status(401).json({ message: 'User not found' })
+            }
+
+            req.user = user
+            next()
         } catch (error) {
-          console.error('JWT Verification Error:', error);
-          res.status(403).json({ message: 'Invalid token' });
-          return;
+            return res.status(403).json({ message: 'Invalid token' })
         }
-      } catch (error) {
-        console.error('Authentication Error:', error); // Debug log
-        next(error);
-      }
-    };
+    } else {
+        res.status(401).json({ message: 'Authorization token required' })
+    }
+}
+
+export const authorize = (roles: string[]) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        if (!req.user || !roles.includes(req.user.role)) {
+            return res.status(403).json({ message: 'Unauthorized access' })
+        }
+        next()
+    }
+}

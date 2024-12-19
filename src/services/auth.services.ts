@@ -1,111 +1,46 @@
-import {PrismaClient, Role, User} from '@prisma/client';
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import {LoginDTO, RegisterDTO, JWTPayload} from '../types/auth.types'
+import prisma from "../utils/prisma.utils"
+import { comparePassword } from "../utils/password.utils";
+import jwt from 'jsonwebtoken';
 
-const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+export const loginService = async (email: string, password: string) => {
+    // Cari user berdasarkan email
+    const user = await prisma.user.findUnique({
+        where: { email },
+        include: {
+            mahasiswa: true,
+            dosen: true,
+            pembimbingInstansi: true
+        }
+    });
 
-export class AuthService {
-    static async register(data: RegisterDTO): Promise<{ user: User; token: string }> {
-        const hashedPassword = await bcrypt.hash(data.password, 10);
+    // Jika user tidak ditemukan
+    if (!user) {
+        throw new Error('Email atau password salah');
+    }
 
-        const user = await prisma.$transaction(async (tx) => {
-            // Create base user
-            const user = await tx.user.create({
-                data: {
-                    email: data.email,
-                    password: hashedPassword,
-                    role: data.role,
-                },
-            });
+    // Bandingkan password
+    const isPasswordValid = await comparePassword(password, user.password);
 
-            // Create role-specific profile
-            switch (data.role) {
-                case 'mahasiswa':
-                    if (!data.nim) throw new Error('NIM required for mahasiswa');
-                    await tx.mahasiswa.create({
-                        data: {
-                            nim: data.nim,
-                            nama: data.nama,
-                            noHp: data.noHp,
-                            semester: data.semester,
-                            userId: user.id,
-                        },
-                    });
-                    break;
+    if (!isPasswordValid) {
+        throw new Error('Email atau password salah');
+    }
 
-                case 'dosen_pembimbing':
-                    if (!data.nip) throw new Error('NIP required for dosen');
-                    await tx.dosen.create({
-                        data: {
-                            nip: data.nip,
-                            nama: data.nama,
-                            userId: user.id,
-                        },
-                    });
-                    break;
-
-                case 'dosen_penguji':
-                    if (!data.nip) throw new Error('NIP required for dosen');
-                    await tx.dosen.create({
-                        data: {
-                            nip: data.nip,
-                            nama: data.nama,
-                            userId: user.id,
-                        },
-                    });
-                    break;
-
-                case 'pembimbing_instansi':
-                    await tx.pembimbingInstansi.create({
-                        data: {
-                            nama: data.nama,
-                            instansi: data.instansi!,
-                            jabatan: data.jabatan,
-                            noTelpon: data.noTelpon,
-                            userId: user.id,
-                        },
-                    });
-                    break;
-            }
-
-            return user;
-        });
-
-        const token = this.generateToken({
+    // Generate token JWT
+    const token = jwt.sign(
+        {
             userId: user.id,
             email: user.email,
-            role: user.role,
-        });
+            role: user.role
+        },
+        process.env.JWT_SECRET || 'default_secret',
+        { expiresIn: '24h' }
+    );
 
-        return {user, token};
-    }
+    // Hapus password sebelum mengembalikan user
+    const { password: _, ...userWithoutPassword } = user;
 
-    static async login(data: LoginDTO): Promise<{ user: User; token: string }> {
-        const user = await prisma.user.findUnique({
-            where: {email: data.email},
-        });
-
-        if (!user) {
-            throw new Error('User not found');
-        }
-
-        const isPasswordValid = await bcrypt.compare(data.password, user.password);
-        if (!isPasswordValid) {
-            throw new Error('Invalid password');
-        }
-
-        const token = this.generateToken({
-            userId: user.id,
-            email: user.email,
-            role: user.role,
-        });
-
-        return {user, token};
-    }
-
-    private static generateToken(payload: JWTPayload): string {
-        return jwt.sign(payload, JWT_SECRET, {expiresIn: '24h'});
-    }
-}
+    return {
+        token,
+        user: userWithoutPassword
+    };
+};
