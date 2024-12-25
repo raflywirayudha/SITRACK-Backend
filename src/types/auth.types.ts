@@ -1,24 +1,10 @@
-import { Role } from '@prisma/client'
+import { z } from 'zod';
 
-export interface LoginDTO {
-    email: string;
-    password: string;
-}
+export const RegisterSchema = z.object({
+    nama: z.string().min(1, "Nama is required"),
+    email: z.string().email("Invalid email format"),
+    password: z.string().min(6, "Password must be at least 6 characters"),
+    nim: z.string().min(11, "Masukkan NIM yang terdaftar"),
+});
 
-export interface RegisterDTO extends LoginDTO {
-    role: Role;
-    nama: string;
-    nim?: string;
-    nip?: string;
-    instansi?: string;
-    jabatan?: string;
-    noHp?: string;
-    noTelpon?: string;
-    semester?: number;
-}
-
-export interface JWTPayload {
-    userId: string;
-    email: string;
-    role: Role;
-}
+export type RegisterInput = z.infer<typeof RegisterSchema>;

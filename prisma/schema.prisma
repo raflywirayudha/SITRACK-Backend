@@ -44,6 +44,13 @@ enum JenisDokumen {
   LEMBAR_PENGESAHAN_KP
 }
 
+enum StatusSeminar {
+  pending // Menunggu konfirmasi
+  scheduled // Terjadwal
+  completed // Selesai
+  cancelled // Dibatalkan
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -55,8 +62,10 @@ model User {
   mahasiswa          Mahasiswa?
   dosen              Dosen?
   pembimbingInstansi PembimbingInstansi?
-  Dokumen            Dokumen[]
+  dokumen            Dokumen[]
   userRoles          UserRole[]
+  dokumenHistory     DokumenHistory[]
+  dokumenReview      DokumenReview[]
 }
 
 model Role {
@@ -84,9 +93,12 @@ model Mahasiswa {
   userId   String  @unique
   user     User    @relation(fields: [userId], references: [id])
 
-  mahasiswaKp MahasiswaKp?
-  dokumen     Dokumen[]
-  nilai       Nilai?
+  mahasiswaKp    MahasiswaKp?
+  dokumen        Dokumen[]
+  jadwalSeminar  JadwalSeminar[]
+  dokumenHistory DokumenHistory[]
+  dokumenReview  DokumenReview[]
+  nilai          Nilai[]
 }
 
 model Dosen {
@@ -100,11 +112,12 @@ model Dosen {
   isKaprodi     Boolean @default(false)
   isKoordinator Boolean @default(false)
 
-  mahasiswaBimbingan     MahasiswaKp[] @relation("DosenPembimbing")
-  nilaiSebagaiPembimbing Nilai[]       @relation("NilaiPembimbing")
-  nilaiSebagaiPenguji    Nilai[]       @relation("NilaiPenguji")
-  dokumenKoordinator     Dokumen[]     @relation("KoordinatorDokumen")
-  nilaiDifinalisasi      Nilai[]       @relation("FinalisasiNilai")
+  mahasiswaBimbingan     MahasiswaKp[]   @relation("DosenPembimbing")
+  jadwalSeminar          JadwalSeminar[]
+  nilaiSebagaiPembimbing Nilai[]         @relation("NilaiPembimbing")
+  nilaiSebagaiPenguji    Nilai[]         @relation("NilaiPenguji")
+  dokumenKoordinator     DokumenReview[] @relation("KoordinatorReview")
+  nilaiDifinalisasi      Nilai[]         @relation("FinalisasiNilai")
 }
 
 model PembimbingInstansi {
@@ -147,26 +160,81 @@ model Dokumen {
   id            String          @id @default(uuid())
   nim           String
   userId        String
-  koordinatorId String
   jenisDokumen  JenisDokumen
   kategori      KategoriDokumen
   filePath      String
   tanggalUpload DateTime        @default(now())
   status        DokumenStatus   @default(submitted)
-  komentar      String?
 
-  mahasiswa   Mahasiswa @relation(fields: [nim], references: [nim])
-  koordinator Dosen     @relation("KoordinatorDokumen", fields: [koordinatorId], references: [id])
-  user        User      @relation(fields: [userId], references: [id])
+  mahasiswa Mahasiswa        @relation(fields: [nim], references: [nim])
+  user      User             @relation(fields: [userId], references: [id])
+  history   DokumenHistory[]
+  reviews   DokumenReview[]
+
+  @@index([nim])
+}
+
+model DokumenHistory {
+  id            String          @id @default(uuid())
+  dokumenId     String
+  nim           String
+  userId        String
+  jenisDokumen  JenisDokumen
+  kategori      KategoriDokumen
+  filePath      String
+  tanggalUpload DateTime        @default(now())
+  version       Int             @default(1)
+
+  dokumen   Dokumen        @relation(fields: [dokumenId], references: [id])
+  mahasiswa Mahasiswa      @relation(fields: [nim], references: [nim])
+  user      User           @relation(fields: [userId], references: [id])
+  review    DokumenReview?
+
+  @@index([nim, dokumenId])
+}
+
+model DokumenReview {
+  id            String        @id @default(uuid())
+  dokumenId     String
+  historyId     String        @unique
+  koordinatorId String
+  status        DokumenStatus
+  komentar      String?
+  tanggalReview DateTime      @default(now())
+
+  dokumen     Dokumen        @relation(fields: [dokumenId], references: [id])
+  history     DokumenHistory @relation(fields: [historyId], references: [id])
+  koordinator Dosen          @relation("KoordinatorReview", fields: [koordinatorId], references: [id])
+  mahasiswa   Mahasiswa      @relation(fields: [nim], references: [nim])
+  user        User           @relation(fields: [userId], references: [id])
+  nim         String
+  userId      String
+
+  @@index([dokumenId, historyId])
+}
+
+model JadwalSeminar {
+  id           String        @id @default(uuid())
+  nim          String
+  tanggal      DateTime
+  waktuMulai   DateTime
+  waktuSelesai DateTime
+  ruangan      String
+  status       StatusSeminar @default(pending)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  dosenId      String // Dosen yang menjadwalkan
+
+  mahasiswa Mahasiswa @relation(fields: [nim], references: [nim])
+  dosen     Dosen     @relation(fields: [dosenId], references: [id])
+  nilai     Nilai? // One-to-one relation dengan nilai
 
   @@index([nim])
 }
 
 model Nilai {
   id                      String    @id @default(uuid())
-  nim                     String?   @unique
-  jadwal                  DateTime?
-  ruangan                 String?
+  jadwalSeminarId         String    @unique // Relasi one-to-one dengan jadwal
   nilaiPembimbing         Float?
   nilaiPenguji            Float?
   nilaiPembimbingInstansi Float?
@@ -179,8 +247,10 @@ model Nilai {
   finalizedAt             DateTime?
   createdAt               DateTime  @default(now())
   updatedAt               DateTime? @updatedAt
+  nim                     String
 
-  mahasiswa          Mahasiswa?          @relation(fields: [nim], references: [nim])
+  jadwalSeminar      JadwalSeminar       @relation(fields: [jadwalSeminarId], references: [id])
+  mahasiswa          Mahasiswa           @relation(fields: [nim], references: [nim])
   dosenPembimbing    Dosen?              @relation("NilaiPembimbing", fields: [dosenPembimbingId], references: [id])
   dosenPenguji       Dosen?              @relation("NilaiPenguji", fields: [dosenPengujiId], references: [id])
   pembimbingInstansi PembimbingInstansi? @relation(fields: [pembimbingInstansiId], references: [id])

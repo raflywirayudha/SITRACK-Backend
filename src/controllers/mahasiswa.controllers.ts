@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import prisma from "../utils/prisma.utils"
+import prisma from "../configs/prisma.configs"
 
 export class MahasiswaController {
     // Enum untuk tahapan dokumen

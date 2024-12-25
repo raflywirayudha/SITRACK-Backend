@@ -1,46 +1,57 @@
-import prisma from "../utils/prisma.utils"
-import { comparePassword } from "../utils/password.utils";
-import jwt from 'jsonwebtoken';
+import prisma from '../configs/prisma.configs';
+import bcrypt from 'bcrypt';
+import { RegisterInput } from '../types/auth.types';
 
-export const loginService = async (email: string, password: string) => {
-    // Cari user berdasarkan email
-    const user = await prisma.user.findUnique({
-        where: { email },
-        include: {
-            mahasiswa: true,
-            dosen: true,
-            pembimbingInstansi: true
-        }
-    });
+export class AuthService {
+    async register(input: RegisterInput) {
+        const hashedPassword = await bcrypt.hash(input.password, 10);
 
-    // Jika user tidak ditemukan
-    if (!user) {
-        throw new Error('Email atau password salah');
+        return prisma.$transaction(async (tx) => {
+            const user = await tx.user.create({
+                data: {
+                    email: input.email,
+                    nama: input.nama,
+                    password: hashedPassword,
+                },
+            });
+
+            const mahasiswaRole = await tx.role.findUnique({
+                where: { name: 'mahasiswa' },
+            });
+
+            if (!mahasiswaRole) {
+                throw new Error('Mahasiswa role not found');
+            }
+
+            await tx.userRole.create({
+                data: {
+                    userId: user.id,
+                    roleId: mahasiswaRole.id,
+                },
+            });
+
+            await tx.mahasiswa.findUnique({
+                where: { nim: input.nim },
+            }).then(existingMahasiswa => {
+                if (existingMahasiswa) {
+                    throw new Error('NIM already exists');
+                }
+            });
+
+            await tx.mahasiswa.create({
+                data: {
+                    userId: user.id,
+                    nim: input.nim,
+                },
+            });
+
+            return user;
+        });
     }
 
-    // Bandingkan password
-    const isPasswordValid = await comparePassword(password, user.password);
-
-    if (!isPasswordValid) {
-        throw new Error('Email atau password salah');
+    checkEmailExists(email: string) {
+        return prisma.user.findUnique({
+            where: { email },
+        });
     }
-
-    // Generate token JWT
-    const token = jwt.sign(
-        {
-            userId: user.id,
-            email: user.email,
-            role: user.role
-        },
-        process.env.JWT_SECRET || 'default_secret',
-        { expiresIn: '24h' }
-    );
-
-    // Hapus password sebelum mengembalikan user
-    const { password: _, ...userWithoutPassword } = user;
-
-    return {
-        token,
-        user: userWithoutPassword
-    };
-};
+}

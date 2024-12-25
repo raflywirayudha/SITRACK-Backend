@@ -1,147 +1,77 @@
-import { Request, Response } from "express";
-import { UserService } from "../services/koordinator.services";
-import { GetUsersQuery } from "../types/user.types";
-import { Role } from "@prisma/client";
-import prisma from "../utils/prisma.utils"
-import { hashPassword } from "../utils/password.utils";
+import { Request, Response } from 'express';
+import { KoordinatorServices } from '../services/koordinator.services';
+import { RegisterSchema } from '../types/user.types';
+import { ZodError } from 'zod';
 
-const userService = new UserService();
+const koordinatorService = new KoordinatorServices();
 
-export const addUser = async (req: Request, res: Response) => {
-    try {
-        const { nama, email, role, password } = req.body;
+export class KoordinatorController {
+    private koordinatorServices: KoordinatorServices;
 
-        // Validasi input
-        if (!nama || !email || !role || !password) {
-            return res.status(400).json({ message: "Semua field harus diisi" });
-        }
-
-        // Role bisa lebih dari satu
-        const roles: Role[] = Array.isArray(role) ? role : [role];
-        const hashedPassword = await hashPassword(password);
-
-        // Buat user
-        const newUser = await prisma.user.create({
-            data: {
-                nama,
-                email,
-                password: hashedPassword, // Simpan password plaintext, sebaiknya di-hash
-                role: roles[0], // Role utama
-            },
-        });
-
-        return res.status(201).json({ message: "User berhasil ditambahkan", user: newUser });
-    } catch (error) {
-        return res.status(500).json({ error: error.message });
+    constructor() {
+        this.koordinatorServices = new KoordinatorServices();
     }
-};
 
-export const getAllUsers = async (req: Request, res: Response) => {
-    try {
-        // Parsing query parameters
-        const query: GetUsersQuery = {
-            page: req.query.page ? parseInt(req.query.page as string) : 1,
-            pageSize: req.query.pageSize ? parseInt(req.query.pageSize as string) : 10,
-            role: req.query.role as Role | undefined,
-            sortBy: req.query.sortBy as 'nama' | 'createdAt' | 'role' | undefined,
-            sortOrder: req.query.sortOrder as 'asc' | 'desc' | undefined
-        };
+    register = async (req: Request, res: Response) => {
+        try {
+            // Validate input
+            const validatedInput = RegisterSchema.parse(req.body);
 
-        // Validasi role jika disediakan
-        if (query.role && !Object.values(Role).includes(query.role)) {
-            return res.status(400).json({
-                message: 'Invalid role provided'
+            // Process registration
+            const result = await this.koordinatorServices.register(validatedInput);
+
+            return res.status(201).json({
+                success: true,
+                message: 'Registration successful',
+                data: {
+                    id: result.id,
+                    email: result.email,
+                    nama: result.nama,
+                }
+            });
+
+        } catch (error) {
+            if (error instanceof ZodError) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Validation failed',
+                    errors: error.errors.map(err => ({
+                        field: err.path.join('.'),
+                        message: err.message
+                    }))
+                });
+            }
+
+            if (error instanceof Error) {
+                // Handle known error types
+                if (error.message.includes('already exists')) {
+                    return res.status(409).json({
+                        success: false,
+                        message: error.message
+                    });
+                }
+
+                if (error.message.includes('not found')) {
+                    return res.status(404).json({
+                        success: false,
+                        message: error.message
+                    });
+                }
+
+                if (error.message.includes('required')) {
+                    return res.status(400).json({
+                        success: false,
+                        message: error.message
+                    });
+                }
+            }
+
+            // Default error response
+            console.error('Registration error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Internal server error'
             });
         }
-
-        // Ambil users
-        const result = await userService.getAllUsers(query);
-
-        res.json({
-            message: 'Users retrieved successfully',
-            ...result
-        });
-    } catch (error) {
-        console.error('Error retrieving users:', error);
-        res.status(500).json({
-            message: 'Error retrieving users',
-            error: error instanceof Error ? error.message : 'Unknown error'
-        });
-    }
+    };
 }
-
-// Tambah Jadwal Seminar
-export const addJadwal = async (req, res) => {
-    try {
-        const { nim, dosenPengujiId, tanggal, ruangan } = req.body;
-
-        // Validasi input
-        if (!nim || !dosenPengujiId || !tanggal || !ruangan) {
-            return res.status(400).json({ message: "Semua input wajib diisi!" });
-        }
-
-        // Cek apakah mahasiswa ada
-        const mahasiswa = await prisma.mahasiswa.findUnique({
-            where: { nim },
-        });
-        if (!mahasiswa) {
-            return res.status(404).json({ message: "Mahasiswa tidak ditemukan" });
-        }
-
-        // Cek apakah dosen penguji ada
-        const dosenPenguji = await prisma.dosen.findUnique({
-            where: { id: dosenPengujiId },
-        });
-        if (!dosenPenguji) {
-            return res.status(404).json({ message: "Dosen penguji tidak ditemukan" });
-        }
-
-        // Tambahkan jadwal
-        const newJadwal = await prisma.nilai.create({
-            data: {
-                nim,
-                dosenPengujiId,
-                jadwal: new Date(tanggal),
-                ruangan,
-            },
-        });
-
-        return res.status(201).json({
-            message: "Jadwal berhasil ditambahkan",
-            data: newJadwal,
-        });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Internal Server Error" });
-    }
-};
-
-// Get Semua Jadwal Seminar
-export const getJadwal = async (req, res) => {
-    try {
-        const jadwalList = await prisma.nilai.findMany({
-            select: {
-                id: true,
-                jadwal: true,
-                ruangan: true,
-                mahasiswa: {
-                    select: {
-                        nim: true,
-                        user: { select: { nama: true } },
-                    },
-                },
-                dosenPenguji: {
-                    select: { user: { select: { nama: true } } },
-                },
-            },
-        });
-
-        return res.status(200).json({
-            message: "Daftar jadwal berhasil diambil",
-            data: jadwalList,
-        });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Internal Server Error" });
-    }
-};

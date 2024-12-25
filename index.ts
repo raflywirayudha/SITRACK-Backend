@@ -3,6 +3,7 @@ import cors from "cors";
 import authRoutes from "./src/routes/auth.routes.js";
 import mahasiswaRoutes from "./src/routes/mahasiswa.routes.js";
 import koordinatorRoutes from "./src/routes/koordinator.routes";
+import { errorHandler } from "./src/middlewares/errorHandler.middleware";
 
 const app = express();
 const port = 5000;
@@ -22,9 +23,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(authRoutes);
-app.use(mahasiswaRoutes);
-app.use(koordinatorRoutes);
+app.use("/sitrack", authRoutes);
+// app.use("/sitrack", mahasiswaRoutes);
+app.use("/sitrack", koordinatorRoutes);
+app.use(errorHandler);
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);

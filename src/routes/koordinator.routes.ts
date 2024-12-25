@@ -1,27 +1,28 @@
 import express from 'express';
-import {getAllUsers, addUser, addJadwal, getJadwal} from "../controllers/koordinator.controllers"
-import {authenticateJWT, authorize} from "../middlewares/auth.middlewares"
+import {KoordinatorController} from "../controllers/koordinator.controllers"
+import { validateCreateUser } from "../middlewares/validation.middlewares";
 
 const router = express.Router();
 
+const koordinatorController = new KoordinatorController();
 router.post(
     "/koordinator/user",
-    addUser
+    koordinatorController.register,
 );
 
-router.get(
-    "/koordinator/users",
-    getAllUsers
-);
-
-router.post(
-    "/koordinator/jadwal",
-    addJadwal
-)
-
-router.get(
-    "/koordinator/jadwal",
-    getJadwal
-)
+// router.get(
+//     "/koordinator/users",
+//     getAllUsers
+// );
+//
+// router.post(
+//     "/koordinator/jadwal",
+//     addJadwal
+// )
+//
+// router.get(
+//     "/koordinator/jadwal",
+//     getJadwal
+// )
 
 export default router;
