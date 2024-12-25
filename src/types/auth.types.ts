@@ -8,3 +8,18 @@ export const RegisterSchema = z.object({
 });
 
 export type RegisterInput = z.infer<typeof RegisterSchema>;
+
+import { RoleType } from '@prisma/client';
+
+export const LoginSchema = z.object({
+    email: z.string().email(),
+    password: z.string()
+});
+
+export type LoginDTO = z.infer<typeof LoginSchema>;
+
+export interface JWTPayload {
+    userId: string;
+    email: string;
+    roles: RoleType[];
+}

@@ -1,6 +1,8 @@
 import prisma from '../configs/prisma.configs';
 import bcrypt from 'bcrypt';
-import { RegisterInput } from '../types/auth.types';
+import jwt from 'jsonwebtoken';
+import { RegisterInput, LoginDTO } from '../types/auth.types';
+import {RoleType} from "@prisma/client";
 
 export class AuthService {
     async register(input: RegisterInput) {
@@ -53,5 +55,58 @@ export class AuthService {
         return prisma.user.findUnique({
             where: { email },
         });
+    }
+
+
+    async login(loginDto: LoginDTO) {
+        const user = await prisma.user.findUnique({
+            where: { email: loginDto.email },
+            include: {
+                userRoles: {
+                    include: {
+                        role: true
+                    }
+                }
+            }
+        });
+
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
+        if (!isPasswordValid) {
+            throw new Error('Invalid password');
+        }
+
+        const roles = user.userRoles.map(ur => ur.role.name);
+        const token = jwt.sign(
+            {
+                userId: user.id,
+                email: user.email,
+                roles
+            },
+            process.env.JWT_SECRET!,
+            { expiresIn: '24h' }
+        );
+
+        return {
+            token,
+            user: {
+                id: user.id,
+                email: user.email,
+                nama: user.nama,
+                roles
+            }
+        };
+    }
+
+    async validateRole(userId: string, requiredRoles: RoleType[]): Promise<boolean> {
+        const userRoles = await prisma.userRole.findMany({
+            where: { userId },
+            include: { role: true }
+        });
+
+        return userRoles.some(ur => requiredRoles.includes(ur.role.name));
     }
 }
