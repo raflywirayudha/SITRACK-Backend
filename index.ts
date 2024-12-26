@@ -24,7 +24,7 @@ app.use((req, res, next) => {
 });
 
 app.use("/sitrack", authRoutes);
-// app.use("/sitrack", mahasiswaRoutes);
+app.use("/sitrack", mahasiswaRoutes);
 app.use("/sitrack", koordinatorRoutes);
 app.use(errorHandler);
 

@@ -1,29 +1,52 @@
 import express from "express";
-import mahasiswaController from "../controllers/mahasiswa.controllers"
-import uploadMiddleware from "../middlewares/upload.middlewares";
+import {authenticateToken, authorizeRoles} from "../middlewares/auth.middlewares";
+import {getCurrentUser, MahasiswaControllers} from "../controllers/mahasiswa.controllers";
+import {upload} from "../middlewares/fileUpload";
 
 const router = express.Router();
+const mahasiswaControllers = new MahasiswaControllers();
 
 router.post(
     "/mahasiswa/upload",
-    uploadMiddleware.single("dokumen"),
-    mahasiswaController.uploadDokumen
+    authenticateToken,
+    authorizeRoles(['mahasiswa']),
+    upload.single("file"),
+    mahasiswaControllers.uploadDocument
 )
 
-router.put(
-    "/mahasiswa/dokumen/:dokumenId",
-    uploadMiddleware.single("dokumen"),
-    mahasiswaController.updateDokumen
+router.get(
+    "/mahasiswa/tahap/:kategori/:nim",
+    authenticateToken,
+    authorizeRoles(['mahasiswa']),
+    mahasiswaControllers.getDocumentsByStage
+)
+
+router.get(
+    "/mahasiswa/history/:kategori/:nim",
+    authenticateToken,
+    authorizeRoles(['mahasiswa']),
+    mahasiswaControllers.getDocumentHistory
 )
 
 router.post(
     "/mahasiswa/pendaftaran",
-    mahasiswaController.daftarKP
+    authenticateToken,
+    authorizeRoles(['mahasiswa']),
+    mahasiswaControllers.updateRegistrationData
 )
 
 router.get(
-    "/mahasiswa/dokumen/:nim",
-    mahasiswaController.getDokumenTerkirim
+    "/mahasiswa/cek-tahapan/:kategori/:nim",
+    authenticateToken,
+    authorizeRoles(['mahasiswa']),
+    mahasiswaControllers.checkStageCompletion
+)
+
+router.get(
+    "/mahasiswa/me",
+    authenticateToken,
+    authorizeRoles(['mahasiswa']),
+    getCurrentUser
 )
 
 export default router;

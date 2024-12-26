@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AuthService } from '../services/auth.services';
 import { RegisterSchema, LoginSchema } from '../types/auth.types';
 import { z } from 'zod';
+import prisma from "../configs/prisma.configs";
 
 export class AuthController {
     private authService: AuthService;

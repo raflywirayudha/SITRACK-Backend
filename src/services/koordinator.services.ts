@@ -40,7 +40,7 @@ export class KoordinatorServices {
             ));
 
             // Handle special role requirements
-            if (input.roles.some(role => ['dosen_pembimbing', 'dosen_penguji', 'kaprodi'].includes(role))) {
+            if (input.roles.some(role => ['dosen_pembimbing', 'dosen_penguji', 'kaprodi', 'koordinator'].includes(role))) {
                 if (!input.nip) {
                     throw new Error('NIP is required for dosen roles');
                 }
@@ -60,6 +60,7 @@ export class KoordinatorServices {
                         isPembimbing: input.roles.includes('dosen_pembimbing'),
                         isPenguji: input.roles.includes('dosen_penguji'),
                         isKaprodi: input.roles.includes('kaprodi'),
+                        isKoordinator: input.roles.includes('koordinator'),
                     },
                 });
             }

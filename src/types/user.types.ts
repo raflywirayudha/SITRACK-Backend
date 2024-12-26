@@ -10,3 +10,24 @@ export const RegisterSchema = z.object({
 });
 
 export type RegisterInput = z.infer<typeof RegisterSchema>;
+
+export interface UserResponse {
+    id: string;
+    nama: string;
+    email: string;
+    role: string;
+    photoPath?: string;
+    status?: string;
+    nim?: string;
+    nip?: string;
+    createdAt: string;
+}
+
+export interface GetUsersQuery {
+    page?: string;
+    pageSize?: string;
+    role?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    search?: string;
+}

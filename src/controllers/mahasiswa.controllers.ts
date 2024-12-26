@@ -1,103 +1,190 @@
-import { Request, Response } from 'express'
+import { Request, Response } from 'express';
+import {DokumenStatus, JenisDokumen, KategoriDokumen} from '@prisma/client';
+import { uploadFile } from '../middlewares/fileUpload';
+import { getRequiredDocuments } from "../utils/document.validation";
 import prisma from "../configs/prisma.configs"
 
-export class MahasiswaController {
-    // Enum untuk tahapan dokumen
-    private static TAHAPAN_DOKUMEN = {
-        PERSYARATAN: [
-            'SURAT_KETERANGAN_SELESAI_KP',
-            'LEMBAR_PERNYATAAN_SELESAI_KP',
-            'DAILY_REPORT',
-            'LAPORAN_TAMBAHAN_KP',
-            'SURAT_BIMBINGAN_DOSEN',
-            'SETORAN_HAFALAN',
-            'FORM_KEHADIRAN_SEMINAR'
-        ],
-        PENDAFTARAN: [
-            'LEMBAR_PERNYATAAN_SELESAI_KP',
-            'SURAT_BIMBINGAN_DOSEN',
-            'SETORAN_HAFALAN',
-            'PENGAJUAN_PENDAFTARAN_DISEMINASI'
-        ],
-        PASCA_SEMINAR: [
-            'SURAT_UNDANGAN_SEMINAR_HASIL',
-            'BERITA_ACARA_SEMINAR',
-            'DAFTAR_HADIR_SEMINAR',
-            'LEMBAR_PENGESAHAN_KP'
-        ]
-    }
-
-    // Upload Dokumen
-    async uploadDokumen(req: Request, res: Response) {
+export class MahasiswaControllers {
+    // Upload document handler
+    async uploadDocument(req: Request, res: Response) {
         try {
-            const { userId, nim, jenisDokumen, kategori } = req.body
-            const file = req.file
+            const { nim, userId, jenisDokumen, kategori } = req.body;
+            const file = req.file;
 
-            // Validasi jenis dokumen sesuai tahapan
-            if (!this.validateDokumen(jenisDokumen, kategori)) {
-                return res.status(400).json({ message: 'Dokumen tidak sesuai dengan tahapan' })
+            if (!file) {
+                return res.status(400).json({ message: 'No file uploaded' });
             }
 
-            // Cari koordinator KP
-            const koordinator = await prisma.dosen.findFirst({
-                where: { isKoordinator: true }
-            })
+            const today = new Date().toISOString().split('T')[0];
 
-            if (!koordinator) {
-                return res.status(404).json({ message: 'Koordinator KP tidak ditemukan' })
-            }
+            // Check for existing documents uploaded today
+            const existingDocument = await prisma.dokumen.findFirst({
+                where: {
+                    nim,
+                    kategori,
+                    jenisDokumen,
+                    tanggalUpload: {
+                        gte: new Date(today)
+                    }
+                },
+                include: {
+                    history: {
+                        orderBy: {
+                            version: 'desc'
+                        },
+                        take: 1
+                    }
+                }
+            });
 
-            const dokumen = await prisma.dokumen.create({
-                data: {
+            const filePath = await uploadFile(file);
+
+            // Create new document or use existing one
+            const document = await prisma.dokumen.upsert({
+                where: {
+                    id: existingDocument?.id ?? '',
+                },
+                create: {
                     nim,
                     userId,
-                    koordinatorId: koordinator.id,
                     jenisDokumen,
                     kategori,
-                    filePath: file?.path || '', // Sesuaikan dengan logic upload file Anda
-                    status: 'submitted'
+                    filePath,
+                    status: 'submitted',
+                    history: {
+                        create: {
+                            nim,
+                            userId,
+                            jenisDokumen,
+                            kategori,
+                            filePath,
+                            version: 1
+                        }
+                    }
+                },
+                update: {
+                    filePath,
+                    status: 'submitted',
+                    history: {
+                        create: {
+                            nim,
+                            userId,
+                            jenisDokumen,
+                            kategori,
+                            filePath,
+                            version: 1
+                        }
+                    }
+                },
+                include: {
+                    history: {
+                        include: {
+                            review: true
+                        }
+                    },
+                    reviews: true,
+                    mahasiswa: {
+                        include: {
+                            user: true
+                        }
+                    }
                 }
-            })
+            });
 
-            res.status(201).json(dokumen)
+            return res.status(201).json(document);
         } catch (error) {
-            console.error('Error upload dokumen:', error)
-            res.status(500).json({ message: 'Gagal upload dokumen' })
+            console.error('Error uploading document:', error);
+            return res.status(500).json({ message: 'Internal server error' });
         }
     }
 
-    // Update Dokumen
-    async updateDokumen(req: Request, res: Response) {
+    async getDocumentHistory(req: Request, res: Response) {
         try {
-            const { dokumentId } = req.params
-            const { jenisDokumen, kategori } = req.body
-            const file = req.file
+            const { nim, kategori } = req.params;
 
-            // Validasi jenis dokumen sesuai tahapan
-            if (!this.validateDokumen(jenisDokumen, kategori)) {
-                return res.status(400).json({ message: 'Dokumen tidak sesuai dengan tahapan' })
-            }
-
-            const dokumen = await prisma.dokumen.update({
-                where: { id: dokumentId },
-                data: {
-                    jenisDokumen,
-                    kategori,
-                    filePath: file?.path || '',
-                    tanggalUpload: new Date(),
-                    status: 'submitted'
+            // Get all documents grouped by submission date
+            const documents = await prisma.dokumen.findMany({
+                where: {
+                    nim,
+                    kategori: kategori as KategoriDokumen,
+                },
+                include: {
+                    reviews: true,
+                    history: {
+                        include: {
+                            review: true,
+                            user: {
+                                select: {
+                                    nama: true,
+                                    email: true
+                                }
+                            }
+                        },
+                        orderBy: {
+                            tanggalUpload: 'desc'
+                        }
+                    }
                 }
-            })
+            });
 
-            res.status(200).json(dokumen)
+            // Group documents by submission date (YYYY-MM-DD)
+            const groupedDocuments = documents.reduce((acc, doc) => {
+                const date = new Date(doc.tanggalUpload).toISOString().split('T')[0];
+                if (!acc[date]) {
+                    acc[date] = {
+                        date,
+                        documents: [],
+                        status: 'menunggu' as const
+                    };
+                }
+                acc[date].documents.push(doc);
+
+                // Update group status based on document statuses
+                if (doc.status === 'rejected') {
+                    acc[date].status = 'revisi';
+                } else if (doc.status === 'verified' && acc[date].status !== 'revisi') {
+                    acc[date].status = 'diterima';
+                }
+
+                return acc;
+            }, {} as Record<string, any>);
+
+            // Convert to array and sort by date
+            const result = Object.values(groupedDocuments).sort((a, b) =>
+                new Date(b.date).getTime() - new Date(a.date).getTime()
+            );
+
+            return res.status(200).json(result);
         } catch (error) {
-            console.error('Error update dokumen:', error)
-            res.status(500).json({ message: 'Gagal update dokumen' })
+            console.error('Error fetching document history:', error);
+            return res.status(500).json({ message: 'Internal server error' });
         }
     }
 
-    // Pendaftaran KP
-    async daftarKP(req: Request, res: Response) {
+    // Get documents by stage
+    async getDocumentsByStage(req: Request, res: Response) {
+        try {
+            const { nim, kategori } = req.params;
+
+            const documents = await prisma.dokumen.findMany({
+                where: {
+                    nim,
+                    kategori: kategori as KategoriDokumen,
+                },
+                include: {
+                    reviews: true,
+                },
+            });
+
+            return res.status(200).json(documents);
+        } catch (error) {
+            console.error('Error fetching documents:', error);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+
+    // Update MahasiswaKP registration data
+    async updateRegistrationData(req: Request, res: Response) {
         try {
             const {
                 nim,
@@ -107,63 +194,121 @@ export class MahasiswaController {
                 mulaiKp,
                 selesaiKp,
                 namaPembimbingInstansi,
+                jabatanPembimbingInstansi,
                 noTeleponPembimbing,
-                emailPembimbingInstansi
-            } = req.body
+                emailPembimbingInstansi,
+            } = req.body;
 
-            const mahasiswaKp = await prisma.mahasiswaKp.create({
+            // Validasi NIM
+            if (!nim) {
+                return res.status(400).json({ message: 'NIM is required' });
+            }
+
+            // Validasi required fields
+            if (!judulLaporan || !namaInstansi || !alamatInstansi ||
+                !mulaiKp || !selesaiKp || !namaPembimbingInstansi ||
+                !noTeleponPembimbing || !emailPembimbingInstansi) {
+                return res.status(400).json({
+                    message: 'All fields are required'
+                });
+            }
+
+            // Validasi format tanggal
+            const mulaiKpDate = new Date(mulaiKp);
+            const selesaiKpDate = new Date(selesaiKp);
+
+            if (isNaN(mulaiKpDate.getTime()) || isNaN(selesaiKpDate.getTime())) {
+                return res.status(400).json({
+                    message: 'Invalid date format. Use YYYY-MM-DD format'
+                });
+            }
+
+            const updatedData = await prisma.mahasiswaKp.update({
+                where: { nim },
                 data: {
-                    nim,
                     judulLaporan,
                     namaInstansi,
                     alamatInstansi,
-                    mulaiKp: new Date(mulaiKp),
-                    selesaiKp: new Date(selesaiKp),
+                    mulaiKp: mulaiKpDate,
+                    selesaiKp: selesaiKpDate,
+                    jabatanPembimbingInstansi,
                     namaPembimbingInstansi,
                     noTeleponPembimbing,
-                    emailPembimbingInstansi
-                }
-            })
+                    emailPembimbingInstansi,
+                },
+            });
 
-            res.status(201).json(mahasiswaKp)
+            return res.status(200).json(updatedData);
         } catch (error) {
-            console.error('Error pendaftaran KP:', error)
-            res.status(500).json({ message: 'Gagal mendaftar KP' })
+            console.error('Error updating registration data:', error);
+            return res.status(500).json({
+                message: 'Internal server error',
+                error: error instanceof Error ? error.message : 'Unknown error'
+            });
         }
     }
 
-    // Tampilkan Dokumen yang Sudah Terkirim
-    async getDokumenTerkirim(req: Request, res: Response) {
+    // Check if stage is complete
+    async checkStageCompletion(req: Request, res: Response) {
         try {
-            const { nim } = req.params
+            const { nim, kategori } = req.params;
 
-            const dokumen = await prisma.dokumen.findMany({
-                where: { nim },
-                orderBy: { tanggalUpload: 'desc' }
-            })
+            const documents = await prisma.dokumen.findMany({
+                where: {
+                    nim,
+                    kategori: kategori as KategoriDokumen,
+                },
+            });
 
-            res.status(200).json(dokumen)
+            const requiredDocs = getRequiredDocuments(kategori as KategoriDokumen);
+            const isComplete = requiredDocs.every(docType =>
+                documents.some(doc =>
+                    doc.jenisDokumen === docType &&
+                    doc.status === DokumenStatus.verified
+                )
+            );
+
+            return res.status(200).json({ isComplete });
         } catch (error) {
-            console.error('Error ambil dokumen:', error)
-            res.status(500).json({ message: 'Gagal mengambil dokumen' })
-        }
-    }
-
-    // Validasi Dokumen berdasarkan Tahapan
-    private validateDokumen(jenisDokumen: string, kategori: string): boolean {
-        const tahapanDokumen = MahasiswaController.TAHAPAN_DOKUMEN
-
-        switch(kategori) {
-            case 'PERSYARATAN':
-                return tahapanDokumen.PERSYARATAN.includes(jenisDokumen)
-            case 'PENDAFTARAN':
-                return tahapanDokumen.PENDAFTARAN.includes(jenisDokumen)
-            case 'PASCA_SEMINAR':
-                return tahapanDokumen.PASCA_SEMINAR.includes(jenisDokumen)
-            default:
-                return false
+            console.error('Error checking stage completion:', error);
+            return res.status(500).json({ message: 'Internal server error' });
         }
     }
 }
 
-export default new MahasiswaController()
+export const getCurrentUser = async (req: Request, res: Response) => {
+    try {
+        const userId = req.user.userId;
+        console.log('userId from token:', userId);
+
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                nama: true,
+                email: true,
+                userRoles: {
+                    include: {
+                        role: true
+                    }
+                },
+                mahasiswa: {
+                    select: {
+                        nim: true
+                    }
+                }
+            }
+        });
+        console.log('found user:', user); // Debug user result
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.json(user);
+    } catch (error) {
+        const err = error as Error; // Type assertion
+        console.error('Error in getCurrentUser:', err.message);
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};

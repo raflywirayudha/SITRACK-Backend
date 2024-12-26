@@ -3,10 +3,14 @@ import jwt from 'jsonwebtoken';
 import { RoleType } from '@prisma/client';
 import { JWTPayload } from '../types/auth.types';
 
+interface JwtPayload {
+    userId: string;
+}
+
 declare global {
     namespace Express {
         interface Request {
-            user?: JWTPayload;
+            user?: any;
         }
     }
 }
