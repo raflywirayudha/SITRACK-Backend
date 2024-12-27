@@ -3,6 +3,9 @@ import cors from "cors";
 import authRoutes from "./src/routes/auth.routes.js";
 import mahasiswaRoutes from "./src/routes/mahasiswa.routes.js";
 import koordinatorRoutes from "./src/routes/koordinator.routes";
+import pembimbinginstansiRoutes from "./src/routes/pembimbinginstansi.routes";
+import dosenPembimbingRoutes from "./src/routes/dosenpembimbing.routes";
+import dosenpengujiRoutes from "./src/routes/dosenpenguji.routes";
 import { errorHandler } from "./src/middlewares/errorHandler.middleware";
 
 const app = express();
@@ -26,6 +29,10 @@ app.use((req, res, next) => {
 app.use("/sitrack", authRoutes);
 app.use("/sitrack", mahasiswaRoutes);
 app.use("/sitrack", koordinatorRoutes);
+app.use("/sitrack", pembimbinginstansiRoutes);
+app.use("/sitrack", dosenPembimbingRoutes);
+app.use("/sitrack", dosenpengujiRoutes);
+app.use('/uploads', express.static('C:/Indra/Web Project/SiTrack/Backend/uploads'));
 app.use(errorHandler);
 
 app.listen(port, () => {

@@ -223,9 +223,21 @@ export class MahasiswaControllers {
                 });
             }
 
-            const updatedData = await prisma.mahasiswaKp.update({
+            const updatedData = await prisma.mahasiswaKp.upsert({
                 where: { nim },
-                data: {
+                update: {
+                    judulLaporan,
+                    namaInstansi,
+                    alamatInstansi,
+                    mulaiKp: mulaiKpDate,
+                    selesaiKp: selesaiKpDate,
+                    jabatanPembimbingInstansi,
+                    namaPembimbingInstansi,
+                    noTeleponPembimbing,
+                    emailPembimbingInstansi,
+                },
+                create: {
+                    nim,
                     judulLaporan,
                     namaInstansi,
                     alamatInstansi,
@@ -237,6 +249,7 @@ export class MahasiswaControllers {
                     emailPembimbingInstansi,
                 },
             });
+
 
             return res.status(200).json(updatedData);
         } catch (error) {

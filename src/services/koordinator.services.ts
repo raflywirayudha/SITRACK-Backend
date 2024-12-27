@@ -1,6 +1,7 @@
 import {RegisterInput} from "../types/user.types";
 import bcrypt from "bcrypt";
 import prisma from "../configs/prisma.configs";
+import {DokumenStatus} from "@prisma/client";
 
 export class KoordinatorServices {
     async register(input: RegisterInput) {
@@ -84,6 +85,51 @@ export class KoordinatorServices {
             }
 
             return user;
+        });
+    }
+
+    async getDokumenByNim(nim: string) {
+        return prisma.dokumen.findMany({
+            where: { nim },
+            include: {
+                mahasiswa: {
+                    include: { mahasiswaKp: true }
+                }
+            }
+        });
+    }
+
+    async updateDokumenStatus(id: string, status: DokumenStatus, koordinatorId: string, komentar?: string) {
+        const dokumen = await prisma.dokumen.findUnique({ where: { id } });
+
+        if (!dokumen) throw new Error('Dokumen not found');
+
+        const history = await prisma.dokumenHistory.create({
+            data: {
+                dokumenId: dokumen.id,
+                nim: dokumen.nim,
+                userId: dokumen.userId,
+                jenisDokumen: dokumen.jenisDokumen,
+                kategori: dokumen.kategori,
+                filePath: dokumen.filePath,
+            }
+        });
+
+        await prisma.dokumenReview.create({
+            data: {
+                dokumenId: dokumen.id,
+                historyId: history.id,
+                koordinatorId,
+                status,
+                komentar,
+                nim: dokumen.nim,
+                userId: dokumen.userId
+            }
+        });
+
+        return prisma.dokumen.update({
+            where: { id },
+            data: { status }
         });
     }
 }

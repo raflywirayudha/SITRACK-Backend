@@ -223,18 +223,18 @@ model JadwalSeminar {
   status       StatusSeminar @default(pending)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
-  dosenId      String // Dosen yang menjadwalkan
+  dosenId      String
 
   mahasiswa Mahasiswa @relation(fields: [nim], references: [nim])
   dosen     Dosen     @relation(fields: [dosenId], references: [id])
-  nilai     Nilai? // One-to-one relation dengan nilai
+  nilai     Nilai?
 
   @@index([nim])
 }
 
 model Nilai {
   id                      String    @id @default(uuid())
-  jadwalSeminarId         String    @unique // Relasi one-to-one dengan jadwal
+  jadwalSeminarId         String    @unique
   nilaiPembimbing         Float?
   nilaiPenguji            Float?
   nilaiPembimbingInstansi Float?
