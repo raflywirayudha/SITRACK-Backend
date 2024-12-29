@@ -3,10 +3,8 @@ import fs from 'fs/promises';
 import { randomUUID } from 'crypto';
 import multer from 'multer';
 
-// Konfigurasi direktori upload
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 
-// Konfigurasi multer untuk handling file upload
 export const storage = multer.diskStorage({
     destination: async (req, file, cb) => {
         try {
@@ -25,7 +23,6 @@ export const storage = multer.diskStorage({
     }
 });
 
-// Konfigurasi filter file
 const fileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     // Daftar mime types yang diizinkan
     const allowedMimeTypes = [
@@ -43,7 +40,6 @@ const fileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.
     }
 };
 
-// Membuat instance multer
 export const upload = multer({
     storage: storage,
     fileFilter: fileFilter,
@@ -52,7 +48,6 @@ export const upload = multer({
     }
 });
 
-// Fungsi utama untuk upload file
 export const uploadFile = async (file: Express.Multer.File): Promise<string> => {
     try {
         // Pastikan direktori upload ada
@@ -82,7 +77,6 @@ export const uploadFile = async (file: Express.Multer.File): Promise<string> => 
     }
 };
 
-// Fungsi untuk menghapus file
 export const deleteFile = async (filePath: string): Promise<void> => {
     try {
         const absolutePath = path.join(process.cwd(), filePath);
@@ -93,7 +87,6 @@ export const deleteFile = async (filePath: string): Promise<void> => {
     }
 };
 
-// Fungsi untuk memvalidasi ukuran dan tipe file
 export const validateFile = (file: Express.Multer.File): void => {
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
