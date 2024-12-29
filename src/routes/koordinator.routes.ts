@@ -123,6 +123,7 @@ router.put(
     authorizeRoles(['koordinator']),
     nilaiController.updateNilai
 );
+
 router.get(
     '/nilai/:id',
     authenticateToken,

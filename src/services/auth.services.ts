@@ -109,4 +109,27 @@ export class AuthService {
 
         return userRoles.some(ur => requiredRoles.includes(ur.role.name));
     }
+
+    static async checkEmailExists(email: string): Promise<boolean> {
+        const user = await prisma.user.findUnique({
+            where: { email }
+        });
+        return !!user;
+    }
+
+    static async resetPassword(email: string, newPassword: string): Promise<boolean> {
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        try {
+            const updatedUser = await prisma.user.update({
+                where: { email },
+                data: { password: hashedPassword }
+            });
+
+            return !!updatedUser;
+        } catch (error) {
+            console.error('Error resetting password:', error);
+            return false;
+        }
+    }
 }

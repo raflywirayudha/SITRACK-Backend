@@ -17,6 +17,7 @@ export class MahasiswaControllers {
 
       const today = new Date().toISOString().split("T")[0];
 
+<<<<<<< HEAD
       // Check for existing documents uploaded today
       const existingDocument = await prisma.dokumen.findFirst({
         where: {
@@ -31,9 +32,26 @@ export class MahasiswaControllers {
           history: true,
         },
       });
+=======
+            // Check for existing documents uploaded today
+            const existingDocument = await prisma.dokumen.findFirst({
+                where: {
+                    nim,
+                    kategori,
+                    jenisDokumen,
+                    tanggalUpload: {
+                        gte: new Date(today)
+                    }
+                },
+                include: {
+                    history: true
+                }
+            });
+>>>>>>> 828e6559e20bfe024eca4699081736ca1f18fbf3
 
       const filePath = await uploadFile(file);
 
+<<<<<<< HEAD
       // Create new document or use existing one
       const document = await prisma.dokumen.upsert({
         where: {
@@ -87,6 +105,59 @@ export class MahasiswaControllers {
           },
         },
       });
+=======
+            // Create new document or use existing one
+            const document = await prisma.dokumen.upsert({
+                where: {
+                    id: existingDocument?.id ?? '',
+                },
+                create: {
+                    nim,
+                    userId,
+                    jenisDokumen,
+                    kategori,
+                    filePath,
+                    status: 'submitted',
+                    history: {
+                        create: {
+                            nim,
+                            userId,
+                            jenisDokumen,
+                            kategori,
+                            filePath,
+                            version: 1
+                        }
+                    }
+                },
+                update: {
+                    filePath,
+                    status: 'submitted',
+                    history: {
+                        create: {
+                            nim,
+                            userId,
+                            jenisDokumen,
+                            kategori,
+                            filePath,
+                            version: existingDocument ? existingDocument.history.length + 1 : 1
+                        }
+                    }
+                },
+                include: {
+                    history: {
+                        include: {
+                            mahasiswa: true,
+                            user: true
+                        }
+                    },
+                    mahasiswa: {
+                        include: {
+                            user: true
+                        }
+                    }
+                }
+            });
+>>>>>>> 828e6559e20bfe024eca4699081736ca1f18fbf3
 
       return res.status(201).json(document);
     } catch (error) {
