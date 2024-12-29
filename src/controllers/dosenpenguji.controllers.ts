@@ -3,6 +3,7 @@ import prisma from "../configs/prisma.configs";
 import { CreateNilaiDTO, UpdateNilaiDTO } from '../types/seminar.types';
 import { StatusSeminar } from '@prisma/client';
 import { DosenPengujiServices } from "../services/dosenPenguji.services"
+import { GradeServiceDosenPenguji } from "../services/nilai.services";
 
 export class DosenPengujiController {
     private dosenPengujiServices: DosenPengujiServices;
@@ -225,3 +226,23 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
+
+export class GradeControlleDosenPenguji {
+    async submitGrade(req: Request, res: Response) {
+        try {
+            const { jadwalSeminarId, grades } = req.body;
+            const dosenId = req.user?.dosen?.id; // Assuming you have user auth middleware
+
+            if (!dosenId) {
+                return res.status(401).json({ message: 'Unauthorized' });
+            }
+
+            const result = await GradeServiceDosenPenguji.submitGrade(jadwalSeminarId, dosenId, grades);
+
+            res.status(200).json(result);
+        } catch (error) {
+            console.error('Error submitting grade:', error);
+            res.status(500).json({ message: 'Internal server error' });
+        }
+    }
+}

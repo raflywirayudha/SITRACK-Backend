@@ -5,7 +5,7 @@ import { StudentResponse } from "../types/mahasiswa.types"
 import { ZodError } from 'zod';
 import prisma from "../configs/prisma.configs";
 
-const koordinotorService = new KoordinatorServices();
+const koordinatorService = new KoordinatorServices();
 
 export class KoordinatorController {
     private koordinatorServices: KoordinatorServices;
@@ -45,6 +45,12 @@ export class KoordinatorController {
             }
 
             if (error instanceof Error) {
+                if (error.message.includes('Unique constraint failed')) {
+                    return res.status(409).json({
+                        success: false,
+                        message: 'Nomor telepon sudah terdaftar. Mohon gunakan nomor telepon lain'
+                    });
+                }
                 // Handle known error types
                 if (error.message.includes('already exists')) {
                     return res.status(409).json({
@@ -224,7 +230,7 @@ export class KoordinatorController {
     async getDokumen(req: Request, res: Response) {
         try {
             const { nim } = req.params;
-            const dokumen = await koordinotorService.getDokumenByNim(nim);
+            const dokumen = await koordinatorService.getDokumenByNim(nim);
             res.json(dokumen);
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -237,7 +243,7 @@ export class KoordinatorController {
             const { status, komentar } = req.body;
             const koordinatorId = req.user.id; // Assuming user data from middleware
 
-            const updatedDokumen = await koordinotorService.updateDokumenStatus(
+            const updatedDokumen = await koordinatorService.updateDokumenStatus(
                 id,
                 status,
                 koordinatorId,

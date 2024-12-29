@@ -9,6 +9,7 @@ type Student = {
     pembimbing: string;
     judulKP: string;
     action: string;
+    jadwalSeminarId: string;
 };
 
 export class DosenPengujiServices {
@@ -52,7 +53,8 @@ export class DosenPengujiServices {
                 company: schedule.mahasiswa.mahasiswaKp?.namaInstansi || "-",
                 pembimbing: schedule.mahasiswa.mahasiswaKp?.dosenPembimbing?.user.nama || "-",
                 judulKP: schedule.mahasiswa.mahasiswaKp?.judulLaporan || "-",
-                action: `View/${schedule.id}` // Assuming action is a view link with schedule ID
+                action: `View/${schedule.id}`,
+                jadwalSeminarId: schedule.id// Assuming action is a view link with schedule ID
             }));
         } catch (error) {
             throw new Error('Failed to fetch students by examiner');

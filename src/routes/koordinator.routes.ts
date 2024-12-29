@@ -1,16 +1,21 @@
 import express from 'express';
 import {KoordinatorController, getCurrentUser} from "../controllers/koordinator.controllers"
 import {authenticateToken, authorizeRoles} from "../middlewares/auth.middlewares"
-import { SchedulerController, getAllJadwal } from "../controllers/jadwal.controllers"
+import {JadwalController} from "../controllers/jadwal.controllers"
+import {DocumentController} from "../controllers/document.controllers"
+import {NilaiController} from "../controllers/nilai.controllers"
 
 const router = express.Router();
 
 const koordinatorController = new KoordinatorController();
-const schedulerController = new SchedulerController();
+const jadwalController = new JadwalController();
+const documentController = new DocumentController();
+const nilaiController = new NilaiController();
+
 router.post(
     "/koordinator/user",
-    // authenticateToken,
-    // authorizeRoles(['koordinator']),
+    authenticateToken,
+    authorizeRoles(['koordinator']),
     koordinatorController.register,
 );
 
@@ -53,35 +58,76 @@ router.post(
     "/koordinator/jadwal",
     authenticateToken,
     authorizeRoles(['koordinator']),
-    schedulerController.createJadwal
-)
-
-router.get(
-    "/koordinator/jadwal",
-    // authenticateToken,
-    // authorizeRoles(['koordinator']),
-    getAllJadwal
+    jadwalController.createJadwal
 )
 
 router.get(
     "/koordinator/jadwal-mahasiswa",
-    // authenticateToken,
-    // authorizeRoles(['koordinator']),
-    schedulerController.getMahasiswa
+    authenticateToken,
+    authorizeRoles(['koordinator']),
+    jadwalController.getMahasiswa
+)
+
+router.get(
+    "/koordinator/jadwal/dosen-penguji",
+    authenticateToken,
+    authorizeRoles(['koordinator']),
+    jadwalController.getDosenPenguji
 )
 
 router.get(
     "/koordinator/check-dosen-availability",
-    // authenticateToken,
-    // authorizeRoles(['koordinator']),
-    schedulerController.checkDosenAvailability
+    authenticateToken,
+    authorizeRoles(['koordinator']),
+    jadwalController.checkDosenAvailability
 )
 
 router.get(
-    "/koordinator/dosen-penguji",
-    // authenticateToken,
-    // authorizeRoles(['koordinator']),
-    schedulerController.getDosenPenguji
+    "/koordinator/jadwal",
+    authenticateToken,
+    authorizeRoles(['koordinator']),
+    jadwalController.getAllJadwal
 )
+
+router.get(
+    "/koordinator/mahasiswa-document",
+    authenticateToken,
+    authorizeRoles(['koordinator']),
+    documentController.getStudents
+)
+
+router.patch(
+    "/koordinator/document/:id/status",
+    authenticateToken,
+    authorizeRoles(['koordinator']),
+    documentController.updateStatus
+)
+
+router.get(
+    '/koordinator/nilai',
+    authenticateToken,
+    authorizeRoles(['koordinator']),
+    nilaiController.getNilaiList
+);
+
+router.post(
+    '/koordinator/nilai',
+    authenticateToken,
+    authorizeRoles(['koordinator']),
+    nilaiController.createNilai
+);
+
+router.put(
+    '/koordinator/nilai/:id',
+    authenticateToken,
+    authorizeRoles(['koordinator']),
+    nilaiController.updateNilai
+);
+router.get(
+    '/nilai/:id',
+    authenticateToken,
+    authorizeRoles(['koordinator']),
+    nilaiController.getNilaiById
+);
 
 export default router;
