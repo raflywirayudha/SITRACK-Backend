@@ -11,18 +11,20 @@ import { errorHandler } from "./src/middlewares/errorHandler.middleware";
 const app = express();
 const port = 5000;
 
-app.use(cors({
-  origin: "http://localhost:5173",
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Logging middleware
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.path}`);
-  console.log('Headers:', req.headers);
-  console.log('Body:', req.body);
+  console.log("Headers:", req.headers);
+  console.log("Body:", req.body);
   next();
 });
 
@@ -32,7 +34,7 @@ app.use("/sitrack", koordinatorRoutes);
 app.use("/sitrack", pembimbinginstansiRoutes);
 app.use("/sitrack", dosenPembimbingRoutes);
 app.use("/sitrack", dosenpengujiRoutes);
-app.use('/uploads', express.static('C:/Indra/Web Project/SiTrack/Backend/uploads'));
+app.use("/uploads", express.static("C:/SISKPTIF2/SITRACK-Backend/uploads"));
 app.use(errorHandler);
 
 app.listen(port, () => {
