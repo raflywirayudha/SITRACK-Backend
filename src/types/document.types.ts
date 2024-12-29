@@ -1,50 +1,33 @@
-import {JenisDokumen, KategoriDokumen} from "@prisma/client";
+import {JenisDokumen, KategoriDokumen, DokumenStatus} from "@prisma/client";
 
-export interface UploadDocumentDto {
+export interface Document {
+    id: string;
     nim: string;
     userId: string;
     jenisDokumen: JenisDokumen;
     kategori: KategoriDokumen;
-    file: Express.Multer.File;
-}
-
-export interface DokumenWithDetails {
-    id: string;
-    nim: string;
-    jenisDokumen: string;
-    kategori: string;
     filePath: string;
-    status: string;
-    mahasiswa: {
-        user: {
-            nama: string;
-            email: string;
-        }
-    }
+    tanggalUpload: Date;
+    status: DokumenStatus;
 }
 
-export interface MahasiswaKpWithDetails {
-    id: string;
-    nim: string;
-    judulLaporan: string;
-    namaInstansi: string;
-    alamatInstansi: string;
-    mulaiKp: Date;
-    selesaiKp: Date;
-    mahasiswa: {
-        user: {
-            nama: string;
-            email: string;
-        }
-    }
+export interface CreateDocumentReviewDTO {
+    dokumenId: string;
+    koordinatorId: string;
+    status: DokumenStatus;
+    komentar?: string;
 }
 
-export interface DokumenDTO {
+export interface UpdateDocumentStatusDTO {
+    status: 'submitted' | 'verified' | 'rejected';
+    komentar?: string;
+}
+
+export interface DocumentResponse {
     id: string;
-    nim: string;
-    jenisDokumen: string;
-    kategori: string;
+    jenisDokumen: JenisDokumen;
+    kategori: KategoriDokumen;
+    status: DokumenStatus;
     filePath: string;
-    status: string;
     tanggalUpload: Date;
 }

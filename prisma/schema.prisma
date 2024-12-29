@@ -65,7 +65,6 @@ model User {
   dokumen            Dokumen[]
   userRoles          UserRole[]
   dokumenHistory     DokumenHistory[]
-  dokumenReview      DokumenReview[]
 }
 
 model Role {
@@ -97,7 +96,6 @@ model Mahasiswa {
   dokumen        Dokumen[]
   jadwalSeminar  JadwalSeminar[]
   dokumenHistory DokumenHistory[]
-  dokumenReview  DokumenReview[]
   nilai          Nilai[]
 }
 
@@ -116,7 +114,6 @@ model Dosen {
   jadwalSeminar          JadwalSeminar[]
   nilaiSebagaiPembimbing Nilai[]         @relation("NilaiPembimbing")
   nilaiSebagaiPenguji    Nilai[]         @relation("NilaiPenguji")
-  dokumenKoordinator     DokumenReview[] @relation("KoordinatorReview")
   nilaiDifinalisasi      Nilai[]         @relation("FinalisasiNilai")
 }
 
@@ -165,11 +162,11 @@ model Dokumen {
   filePath      String
   tanggalUpload DateTime        @default(now())
   status        DokumenStatus   @default(submitted)
+  komentar      String?
 
   mahasiswa Mahasiswa        @relation(fields: [nim], references: [nim])
   user      User             @relation(fields: [userId], references: [id])
   history   DokumenHistory[]
-  reviews   DokumenReview[]
 
   @@index([nim])
 }
@@ -185,32 +182,11 @@ model DokumenHistory {
   tanggalUpload DateTime        @default(now())
   version       Int             @default(1)
 
-  dokumen   Dokumen        @relation(fields: [dokumenId], references: [id])
-  mahasiswa Mahasiswa      @relation(fields: [nim], references: [nim])
-  user      User           @relation(fields: [userId], references: [id])
-  review    DokumenReview?
+  dokumen   Dokumen   @relation(fields: [dokumenId], references: [id])
+  mahasiswa Mahasiswa @relation(fields: [nim], references: [nim])
+  user      User      @relation(fields: [userId], references: [id])
 
   @@index([nim, dokumenId])
-}
-
-model DokumenReview {
-  id            String        @id @default(uuid())
-  dokumenId     String
-  historyId     String        @unique
-  koordinatorId String
-  status        DokumenStatus
-  komentar      String?
-  tanggalReview DateTime      @default(now())
-
-  dokumen     Dokumen        @relation(fields: [dokumenId], references: [id])
-  history     DokumenHistory @relation(fields: [historyId], references: [id])
-  koordinator Dosen          @relation("KoordinatorReview", fields: [koordinatorId], references: [id])
-  mahasiswa   Mahasiswa      @relation(fields: [nim], references: [nim])
-  user        User           @relation(fields: [userId], references: [id])
-  nim         String
-  userId      String
-
-  @@index([dokumenId, historyId])
 }
 
 model JadwalSeminar {

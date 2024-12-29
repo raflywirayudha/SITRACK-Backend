@@ -109,10 +109,8 @@ export class MahasiswaControllers {
                     kategori: kategori as KategoriDokumen,
                 },
                 include: {
-                    reviews: true,
                     history: {
                         include: {
-                            review: true,
                             user: {
                                 select: {
                                     nama: true,

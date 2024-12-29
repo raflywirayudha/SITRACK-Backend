@@ -1,190 +1,70 @@
 import { Request, Response } from 'express';
-import prisma from "../configs/prisma.configs"
-import { add, format } from 'date-fns';
-import * as jadwalSeminarService from "../services/jadwalSeminar.service";
+import { JadwalService } from '../services/jadwal.service';
 
-export class SchedulerController {
-    // Get Mahasiswa yang belum terjadwal seminar
-    async getMahasiswa(req: Request, res: Response) {
-        try {
-            const mahasiswa = await prisma.mahasiswa.findMany({
-                where: {
-                    jadwalSeminar: {
-                        none: {}
-                    },
-                    mahasiswaKp: {
-                        isNot: null
-                    }
-                },
-                select: {
-                    id: true,
-                    nim: true,
-                    user: {
-                        select: {
-                            nama: true
-                        }
-                    },
-                    mahasiswaKp: {
-                        select: {
-                            judulLaporan: true
-                        }
-                    }
-                }
-            });
+export class JadwalController {
+    private service: JadwalService;
 
-            const formattedMahasiswa = mahasiswa.map(m => ({
-                id: m.id,
-                nim: m.nim,
-                nama: m.user.nama,
-                judul: m.mahasiswaKp?.judulLaporan || ''
-            }));
-
-            return res.json(formattedMahasiswa);
-        } catch (error) {
-            console.error('Error fetching mahasiswa:', error);
-            return res.status(500).json({ error: 'Internal server error' });
-        }
+    constructor() {
+        this.service = new JadwalService();
     }
 
-    // Get Dosen Penguji
-    async getDosenPenguji(req: Request, res: Response) {
+    getMahasiswa = async (req: Request, res: Response) => {
         try {
-            const dosenPenguji = await prisma.dosen.findMany({
-                where: {
-                    isPenguji: true
-                },
-                select: {
-                    id: true,
-                    user: {
-                        select: {
-                            nama: true
-                        }
-                    }
-                }
-            });
-
-            const formattedDosen = dosenPenguji.map(d => ({
-                id: d.id,
-                nama: d.user.nama
-            }));
-
-            return res.json(formattedDosen);
+            const mahasiswaList = await this.service.getMahasiswa();
+            res.json(mahasiswaList);
         } catch (error) {
-            console.error('Error fetching dosen penguji:', error);
-            return res.status(500).json({ error: 'Internal server error' });
+            res.status(500).json({ error: 'Failed to fetch mahasiswa list' });
         }
-    }
+    };
 
-    // Check Dosen Availability
-    async checkDosenAvailability(req: Request, res: Response) {
-        const { dosenId, tanggal, waktuMulai } = req.query;
-
+    getDosenPenguji = async (req: Request, res: Response) => {
         try {
-            const startTime = new Date(`${tanggal}T${waktuMulai}`);
-            const endTime = add(startTime, { hours: 1 });
+            const dosenList = await this.service.getDosenPenguji();
+            res.json(dosenList);
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to fetch dosen penguji list' });
+        }
+    };
 
-            const existingJadwal = await prisma.jadwalSeminar.findFirst({
-                where: {
-                    dosenId: dosenId as string,
-                    tanggal: new Date(tanggal as string),
-                    OR: [
-                        {
-                            AND: [
-                                { waktuMulai: { lte: startTime } },
-                                { waktuSelesai: { gt: startTime } }
-                            ]
-                        },
-                        {
-                            AND: [
-                                { waktuMulai: { lt: endTime } },
-                                { waktuSelesai: { gte: endTime } }
-                            ]
-                        }
-                    ]
-                }
-            });
+    checkDosenAvailability = async (req: Request, res: Response) => {
+        try {
+            const { dosenId, tanggal, waktuMulai } = req.query as {
+                dosenId: string;
+                tanggal: string;
+                waktuMulai: string;
+            };
 
-            if (existingJadwal) {
-                return res.json({
-                    available: false,
-                    message: 'Dosen sudah memiliki jadwal pada waktu tersebut'
-                });
+            const availability = await this.service.checkDosenAvailability(
+                dosenId,
+                tanggal,
+                waktuMulai
+            );
+
+            res.json(availability);
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to check dosen availability' });
+        }
+    };
+
+    createJadwal = async (req: Request, res: Response) => {
+        try {
+            const jadwal = await this.service.createJadwal(req.body);
+            res.status(201).json(jadwal);
+        } catch (error) {
+            if (error instanceof Error) {
+                res.status(400).json({ error: error.message });
+            } else {
+                res.status(500).json({ error: 'Failed to create jadwal' });
             }
-
-            return res.json({
-                available: true
-            });
-        } catch (error) {
-            console.error('Error checking dosen availability:', error);
-            return res.status(500).json({ error: 'Internal server error' });
         }
-    }
+    };
 
-    // Create Jadwal Seminar
-    async createJadwal(req: Request, res: Response) {
-        const { tanggal, waktuMulai, mahasiswaId, dosenPengujiId, ruangan } = req.body;
-
+    getAllJadwal = async (req: Request, res: Response) => {
         try {
-            // Check dosen availability first
-            const startTime = new Date(`${tanggal}T${waktuMulai}`);
-            const endTime = add(startTime, { hours: 1 });
-
-            const existingJadwal = await prisma.jadwalSeminar.findFirst({
-                where: {
-                    dosenId: dosenPengujiId,
-                    tanggal: new Date(tanggal),
-                    OR: [
-                        {
-                            AND: [
-                                { waktuMulai: { lte: startTime } },
-                                { waktuSelesai: { gt: startTime } }
-                            ]
-                        },
-                        {
-                            AND: [
-                                { waktuMulai: { lt: endTime } },
-                                { waktuSelesai: { gte: endTime } }
-                            ]
-                        }
-                    ]
-                }
-            });
-
-            if (existingJadwal) {
-                return res.status(400).json({
-                    error: 'Dosen sudah memiliki jadwal pada waktu tersebut'
-                });
-            }
-
-            // Create new jadwal
-            const jadwal = await prisma.jadwalSeminar.create({
-                data: {
-                    tanggal: new Date(tanggal),
-                    waktuMulai: startTime,
-                    waktuSelesai: endTime,
-                    ruangan,
-                    mahasiswa: {
-                        connect: { id: mahasiswaId }
-                    },
-                    dosen: {
-                        connect: { id: dosenPengujiId }
-                    },
-                    status: 'scheduled'
-                }
-            });
-
-            return res.json(jadwal);
+            const schedules = await this.service.getAllSchedules();
+            res.json(schedules);
         } catch (error) {
-            console.error('Error creating jadwal:', error);
-            return res.status(500).json({ error: 'Internal server error' });
+            res.status(500).json({ error: 'Failed to fetch schedules' });
         }
-    }
+    };
 }
-export const getAllJadwal = async (_req: Request, res: Response) => {
-    try {
-        const jadwal = await jadwalSeminarService.getAllJadwal();
-        return res.status(200).json(jadwal);
-    } catch (error) {
-        return res.status(500).json({ message: "Gagal mengambil data jadwal", error });
-    }
-};
