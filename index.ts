@@ -6,6 +6,7 @@ import koordinatorRoutes from "./src/routes/koordinator.routes";
 import pembimbinginstansiRoutes from "./src/routes/pembimbinginstansi.routes";
 import dosenPembimbingRoutes from "./src/routes/dosenpembimbing.routes";
 import dosenpengujiRoutes from "./src/routes/dosenpenguji.routes";
+import profileRoutes from "./src/routes/profile.routes";
 import { errorHandler } from "./src/middlewares/errorHandler.middleware";
 
 const app = express();
@@ -32,6 +33,7 @@ app.use("/sitrack", koordinatorRoutes);
 app.use("/sitrack", pembimbinginstansiRoutes);
 app.use("/sitrack", dosenPembimbingRoutes);
 app.use("/sitrack", dosenpengujiRoutes);
+app.use("/sitrack", profileRoutes);
 app.use('/uploads', express.static('C:/Indra/Web Project/SiTrack/Backend/uploads'));
 app.use(errorHandler);
 
