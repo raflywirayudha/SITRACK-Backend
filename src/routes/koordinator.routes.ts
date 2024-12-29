@@ -14,8 +14,8 @@ const nilaiController = new NilaiController();
 
 router.post(
     "/koordinator/user",
-    // authenticateToken,
-    // authorizeRoles(['koordinator']),
+    authenticateToken,
+    authorizeRoles(['koordinator']),
     koordinatorController.register,
 );
 
@@ -105,8 +105,8 @@ router.patch(
 
 router.get(
     '/koordinator/nilai',
-    // authenticateToken,
-    // authorizeRoles(['koordinator']),
+    authenticateToken,
+    authorizeRoles(['koordinator']),
     nilaiController.getNilaiList
 );
 
