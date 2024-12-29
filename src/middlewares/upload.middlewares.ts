@@ -1,7 +1,6 @@
 import multer from 'multer'
 import path from 'path'
 
-// Konfigurasi Multer untuk upload file
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, 'uploads/dokumen_kp/')

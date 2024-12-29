@@ -3,6 +3,7 @@ import { AuthService } from '../services/auth.services';
 import { RegisterSchema, LoginSchema } from '../types/auth.types';
 import { z } from 'zod';
 import prisma from "../configs/prisma.configs";
+import { validateEmail, validatePassword } from "../utils/forgotpassword.utils"
 
 export class AuthController {
     private authService: AuthService;
@@ -66,3 +67,60 @@ export class AuthController {
         }
     };
 }
+
+export const checkEmail = async (req: Request, res: Response) => {
+    try {
+        const { email } = req.body;
+
+        if (!validateEmail(email)) {
+            return res.status(400).json({
+                message: 'Format email tidak valid',
+                exists: false
+            });
+        }
+
+        const exists = await AuthService.checkEmailExists(email);
+        return res.json({ exists });
+    } catch (error) {
+        console.error('Error in checkEmail:', error);
+        return res.status(500).json({
+            message: 'Terjadi kesalahan internal server',
+            exists: false
+        });
+    }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+    try {
+        const { email, newPassword } = req.body;
+
+        if (!validateEmail(email)) {
+            return res.status(400).json({
+                message: 'Format email tidak valid'
+            });
+        }
+
+        if (!validatePassword(newPassword)) {
+            return res.status(400).json({
+                message: 'Password harus minimal 8 karakter'
+            });
+        }
+
+        const updated = await AuthService.resetPassword(email, newPassword);
+
+        if (!updated) {
+            return res.status(404).json({
+                message: 'Email tidak ditemukan'
+            });
+        }
+
+        return res.json({
+            message: 'Password berhasil diperbarui'
+        });
+    } catch (error) {
+        console.error('Error in resetPassword:', error);
+        return res.status(500).json({
+            message: 'Terjadi kesalahan internal server'
+        });
+    }
+};

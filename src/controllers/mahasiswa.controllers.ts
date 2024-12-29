@@ -28,12 +28,7 @@ export class MahasiswaControllers {
                     }
                 },
                 include: {
-                    history: {
-                        orderBy: {
-                            version: 'desc'
-                        },
-                        take: 1
-                    }
+                    history: true
                 }
             });
 
@@ -72,17 +67,17 @@ export class MahasiswaControllers {
                             jenisDokumen,
                             kategori,
                             filePath,
-                            version: 1
+                            version: existingDocument ? existingDocument.history.length + 1 : 1
                         }
                     }
                 },
                 include: {
                     history: {
                         include: {
-                            review: true
+                            mahasiswa: true,
+                            user: true
                         }
                     },
-                    reviews: true,
                     mahasiswa: {
                         include: {
                             user: true
